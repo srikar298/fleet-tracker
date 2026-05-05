@@ -1,0 +1,6 @@
+python-telegram-bot --pre
+gspread
+google-auth
+google-api-python-client
+pydantic
+python-dotenv
