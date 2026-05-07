@@ -20,7 +20,6 @@ from core.states import (
     FUEL_DATA,
     FUEL_IMAGE,
     FUEL_PROMPT,
-    START_TRIP_DEST,
     START_TRIP_IMAGE,
     START_TRIP_LOC,
     START_TRIP_ODO,
@@ -47,7 +46,6 @@ class TripHandler(BaseHandler):
             keyboard = [
                 [
                     InlineKeyboardButton("🚗 Trips", callback_data="tgt_Trips"),
-                    InlineKeyboardButton("💰 Revenue", callback_data="tgt_Revenue"),
                 ]
             ]
             await update.message.reply_text(  # noqa: E501 # type: ignore
@@ -94,7 +92,8 @@ class TripHandler(BaseHandler):
     ):
         vehicles = self.sheets.get_all_vehicles()
         keyboard = [
-            [InlineKeyboardButton(v, callback_data=f"veh_{v}")] for v in vehicles
+            [InlineKeyboardButton(v["plate"], callback_data=f"veh_{v['id']}")]
+            for v in vehicles
         ]
         keyboard.append([InlineKeyboardButton("❌ Cancel", callback_data="cancel")])
 
@@ -124,19 +123,10 @@ class TripHandler(BaseHandler):
         context.user_data["last_odo"] = last_odo  # type: ignore
 
         await query.edit_message_text(  # type: ignore
-            f"Vehicle: {vehicle_id}\nLast Reading: {last_odo} km\n\nWhere are you going? (Enter Route/Client):"  # noqa: E501
-        )
-        return START_TRIP_DEST
-
-    async def handle_start_dest(
-        self, update: Update, context: ContextTypes.DEFAULT_TYPE
-    ):
-        context.user_data["destination"] = update.message.text  # type: ignore
-        last = context.user_data.get("last_odo", 0)  # type: ignore
-        await update.message.reply_text(  # type: ignore
-            f"Enter CURRENT Odometer reading (Last: {last} km):"
+            f"Vehicle: {vehicle_id}\nLast Reading: {last_odo} km\n\nEnter CURRENT Odometer reading:"
         )
         return START_TRIP_ODO
+
 
     async def handle_start_odo(
         self, update: Update, context: ContextTypes.DEFAULT_TYPE
@@ -214,7 +204,8 @@ class TripHandler(BaseHandler):
         ):
             vehicles = self.sheets.get_all_vehicles()
             keyboard = [
-                [InlineKeyboardButton(v, callback_data=f"veh_{v}")] for v in vehicles
+                [InlineKeyboardButton(v["plate"], callback_data=f"veh_{v['id']}")]
+                for v in vehicles
             ]
             keyboard.append([InlineKeyboardButton("❌ Cancel", callback_data="cancel")])
             await update.message.reply_text(  # type: ignore
@@ -533,7 +524,7 @@ class TripHandler(BaseHandler):
                 "end_image": context.user_data.get("end_image_url"),  # type: ignore
                 "fuel_image": context.user_data.get("fuel_image_url"),  # type: ignore
                 "flag": flag_str,
-                "remarks": f"Destination: {context.user_data.get('destination', 'None')}",  # type: ignore # noqa: E501
+                "remarks": "B2B Trip recorded",  # type: ignore
             }
 
             self.sheets.record_trip(trip_record)

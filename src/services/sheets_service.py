@@ -65,13 +65,17 @@ class SheetsService:
         return 0
 
     def get_all_vehicles(self):
-        """Returns a list of all vehicle IDs"""
+        """Returns a list of all vehicle data (ID and License Plate)"""
         sheet = self.get_sheet("Master_Vehicles")
         if not sheet:
-            return ["V-001", "V-002", "V-003"]  # Fallback
+            return [{"id": "V-001", "plate": "MH12-1234"}]  # Fallback
 
         records = sheet.get_all_records()
-        return [str(v.get("VehicleID")) for v in records if v.get("VehicleID")]
+        return [
+            {"id": str(v.get("VehicleID")), "plate": str(v.get("LicensePlate"))}
+            for v in records
+            if v.get("VehicleID")
+        ]
 
     def update_vehicle_status(self, vehicle_id, odo, status="Idle"):
         """Updates the status and odo of a vehicle in Master_Vehicles"""
