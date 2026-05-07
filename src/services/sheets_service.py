@@ -17,9 +17,18 @@ class SheetsService:
         self.sheet_id = os.getenv("GOOGLE_SHEETS_ID")
 
         try:
-            self.creds = Credentials.from_service_account_file(
-                self.credentials_path, scopes=self.scope
-            )
+            # Try to load from environment variable first (standard for Cloud/Railway)
+            json_content = os.getenv("GOOGLE_CREDENTIALS_JSON")
+            if json_content:
+                import json
+                info = json.loads(json_content)
+                self.creds = Credentials.from_service_account_info(
+                    info, scopes=self.scope
+                )
+            else:
+                self.creds = Credentials.from_service_account_file(
+                    self.credentials_path, scopes=self.scope
+                )
             self.client = gspread.authorize(self.creds)
             self.spreadsheet = self.client.open_by_key(self.sheet_id)
         except Exception as e:

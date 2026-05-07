@@ -14,9 +14,18 @@ class DriveService:
 
         # Scopes for Drive API
         self.scopes = ["https://www.googleapis.com/auth/drive.file"]
-        self.creds = Credentials.from_service_account_file(
-            self.credentials_file, scopes=self.scopes
-        )
+        
+        json_content = os.getenv("GOOGLE_CREDENTIALS_JSON")
+        if json_content:
+            import json
+            info = json.loads(json_content)
+            self.creds = Credentials.from_service_account_info(
+                info, scopes=self.scopes
+            )
+        else:
+            self.creds = Credentials.from_service_account_file(
+                self.credentials_file, scopes=self.scopes
+            )
         self.service = build("drive", "v3", credentials=self.creds)
 
         # Cache for subfolders to avoid redundant API calls
