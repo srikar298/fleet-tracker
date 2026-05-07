@@ -1,109 +1,189 @@
+import io
 import os
-import shutil
 from datetime import datetime
+
+from google.oauth2.service_account import Credentials
+from googleapiclient.discovery import build
+from googleapiclient.http import MediaIoBaseUpload
 
 
 class DriveService:
     def __init__(self):
-        self.base_dir = os.path.join(os.getcwd(), "trip_images")
-        self.flagged_dir = os.path.join(self.base_dir, "Flagged_Review")
+        self.folder_id = os.getenv("GOOGLE_DRIVE_FOLDER_ID")
+        self.credentials_file = os.getenv("SERVICE_ACCOUNT_FILE", "credentials.json")
 
-        self.financial_dir = os.path.join(os.getcwd(), "01_Financial_Reconciliation")
-        self.expense_dir = os.path.join(os.getcwd(), "02_Expense_Claims")
-        self.kyc_dir = os.path.join(os.getcwd(), "03_Compliance_KYC")
-        self.incident_dir = os.path.join(os.getcwd(), "04_Incident_Reports")
-        self.archive_dir = os.path.join(os.getcwd(), "05_Archived_Data")
+        # Scopes for Drive API
+        self.scopes = ["https://www.googleapis.com/auth/drive.file"]
+        self.creds = Credentials.from_service_account_file(
+            self.credentials_file, scopes=self.scopes
+        )
+        self.service = build("drive", "v3", credentials=self.creds)
 
-        for d in [
-            self.base_dir,
-            self.flagged_dir,
-            self.financial_dir,
-            self.expense_dir,
-            self.kyc_dir,
-            self.incident_dir,
-            self.archive_dir,
-        ]:
-            os.makedirs(d, exist_ok=True)
+        # Cache for subfolders to avoid redundant API calls
+        self._folder_cache = {}
+
+    def _get_or_create_subfolder(self, name, parent_id):
+        """Finds or creates a subfolder within a parent folder."""
+        cache_key = f"{parent_id}_{name}"
+        if cache_key in self._folder_cache:
+            return self._folder_cache[cache_key]
+
+        query = (
+            f"name = '{name}' and '{parent_id}' in parents and "
+            f"mimeType = 'application/vnd.google-apps.folder' and trashed = false"
+        )
+        results = (
+            self.service.files().list(q=query, fields="files(id, name)").execute()
+        )
+        files = results.get("files", [])
+
+        if files:
+            folder_id = files[0]["id"]
+        else:
+            file_metadata = {
+                "name": name,
+                "mimeType": "application/vnd.google-apps.folder",
+                "parents": [parent_id],
+            }
+            folder = (
+                self.service.files()
+                .create(body=file_metadata, fields="id")
+                .execute()
+            )
+            folder_id = folder.get("id")
+
+        self._folder_cache[cache_key] = folder_id
+        return folder_id
 
     def upload_file(self, file_content, driver_name, trip_id, image_type):
-        """Saves a file in a structured hierarchy for easy super admin auditing"""
+        """Uploads a file to a structured cloud hierarchy on Google Drive."""
         try:
             date_str = datetime.now().strftime("%Y-%m-%d")
             safe_driver_name = "".join([c if c.isalnum() else "_" for c in driver_name])
 
-            # Path: trip_images/YYYY-MM-DD/DriverName/TripID/
-            rel_dir = os.path.join(date_str, safe_driver_name, trip_id)
-            abs_dir = os.path.join(self.base_dir, rel_dir)
-            os.makedirs(abs_dir, exist_ok=True)
+            # Navigate/Create hierarchy: Root -> Date -> Driver -> TripID
+            date_folder = self._get_or_create_subfolder(date_str, self.folder_id)
+            driver_folder = self._get_or_create_subfolder(
+                safe_driver_name, date_folder
+            )
+            trip_folder = self._get_or_create_subfolder(trip_id, driver_folder)
 
             filename = f"{image_type}.jpg"
-            file_path = os.path.join(abs_dir, filename)
+            file_metadata = {"name": filename, "parents": [trip_folder]}
 
-            with open(file_path, "wb") as f:
-                f.write(file_content)
+            fh = io.BytesIO(file_content)
+            media = MediaIoBaseUpload(fh, mimetype="image/jpeg", resumable=True)
 
-            # Return relative path for Google Sheet
-            return os.path.join("trip_images", rel_dir, filename).replace("\\", "/")
+            file = (
+                self.service.files()
+                .create(body=file_metadata, media_body=media, fields="id, webViewLink")
+                .execute()
+            )
+
+            # Make file viewable by anyone with the link (optional, depends on security needs)
+            # For B2B transparency, we usually want the link to be accessible
+            self.service.permissions().create(
+                fileId=file.get("id"),
+                body={"type": "anyone", "role": "viewer"},
+            ).execute()
+
+            return file.get("webViewLink")
         except Exception as e:
-            print(f"Error saving image locally: {e}")
+            print(f"Error uploading to Cloud Drive: {e}")
             return None
 
     def flag_trip_images(self, date_str, driver_name, trip_id):
-        """Copies a trip's folder to the Flagged_Review folder for easy discrepancy audits"""  # noqa: E501
-        safe_driver_name = "".join([c if c.isalnum() else "_" for c in driver_name])
-        source_dir = os.path.join(self.base_dir, date_str, safe_driver_name, trip_id)
-        target_dir = os.path.join(
-            self.flagged_dir, f"{date_str}_{safe_driver_name}_{trip_id}"
-        )
-
-        if os.path.exists(source_dir):
-            try:
-                shutil.copytree(source_dir, target_dir, dirs_exist_ok=True)
+        """Flags a trip by adding a 'FLAGGED' description to the folder."""
+        # Note: In Drive API, we can't easily 'copy' a whole folder structure with one call
+        # but we can rename or add a description for the auditor.
+        try:
+            date_folder = self._get_or_create_subfolder(date_str, self.folder_id)
+            driver_folder = self._get_or_create_subfolder(
+                "".join([c if c.isalnum() else "_" for c in driver_name]), date_folder
+            )
+            
+            # Find the trip folder
+            query = f"name = '{trip_id}' and '{driver_folder}' in parents and trashed = false"
+            results = self.service.files().list(q=query, fields="files(id)").execute()
+            files = results.get("files", [])
+            
+            if files:
+                folder_id = files[0]["id"]
+                self.service.files().update(
+                    fileId=folder_id,
+                    body={"description": "FLAGGED_FOR_REVIEW: Discrepancy detected"}
+                ).execute()
                 return True
-            except Exception as e:
-                print(f"Error copying flagged images: {e}")
+        except Exception as e:
+            print(f"Error flagging cloud folder: {e}")
         return False
 
     def save_kyc_document(self, file_content, driver_name):
-        safe_name = "".join([c if c.isalnum() else "_" for c in driver_name])
-        filename = f"{safe_name}_License.jpg"
-        filepath = os.path.join(self.kyc_dir, filename)
-        with open(filepath, "wb") as f:
-            f.write(file_content)
-        return f"03_Compliance_KYC/{filename}"
+        """Saves KYC to a dedicated 'Compliance' subfolder."""
+        try:
+            kyc_root = self._get_or_create_subfolder("03_Compliance_KYC", self.folder_id)
+            safe_name = "".join([c if c.isalnum() else "_" for c in driver_name])
+            filename = f"{safe_name}_License.jpg"
+            
+            file_metadata = {"name": filename, "parents": [kyc_root]}
+            fh = io.BytesIO(file_content)
+            media = MediaIoBaseUpload(fh, mimetype="image/jpeg")
+            
+            file = self.service.files().create(body=file_metadata, media_body=media, fields="webViewLink").execute()
+            return file.get("webViewLink")
+        except Exception:
+            return None
 
     def save_fuel_receipt(self, file_content, driver_name, trip_id, vehicle_id, cost):
-        # 1. Save standard trip structure
-        rel_path = self.upload_file(file_content, driver_name, trip_id, "fuel_receipt")
+        """Saves fuel receipt both in trip folder and financial reconciliation folder."""
+        # 1. Standard upload
+        web_link = self.upload_file(file_content, driver_name, trip_id, "fuel_receipt")
+        
+        # 2. Duplicate to Finance folder for accounting
+        try:
+            finance_root = self._get_or_create_subfolder("01_Financial_Reconciliation", self.folder_id)
+            month_str = datetime.now().strftime("%Y-%m")
+            month_folder = self._get_or_create_subfolder(month_str, finance_root)
+            
+            date_str = datetime.now().strftime("%Y-%m-%d")
+            filename = f"{date_str}_{vehicle_id}_Rs{cost}.jpg"
+            
+            file_metadata = {"name": filename, "parents": [month_folder]}
+            fh = io.BytesIO(file_content)
+            media = MediaIoBaseUpload(fh, mimetype="image/jpeg")
+            self.service.files().create(body=file_metadata, media_body=media).execute()
+        except Exception:
+            pass
+            
+        return web_link
 
-        # 2. Save copy for financial reconciliation
-        date_str = datetime.now().strftime("%Y-%m-%d")
-        month_str = datetime.now().strftime("%Y-%m")
-        month_dir = os.path.join(self.financial_dir, month_str)
-        os.makedirs(month_dir, exist_ok=True)
-
-        recon_filename = f"{date_str}_{vehicle_id}_Rs{cost}.jpg"
-        recon_path = os.path.join(month_dir, recon_filename)
-        with open(recon_path, "wb") as f:
-            f.write(file_content)
-
-        return rel_path
-
-    def save_expense_receipt(
-        self, file_content, driver_name, vehicle_id, expense_amount
-    ):
-        date_str = datetime.now().strftime("%Y-%m-%d")
-        safe_name = "".join([c if c.isalnum() else "_" for c in driver_name])
-        filename = f"{date_str}_{safe_name}_{vehicle_id}_Rs{expense_amount}.jpg"
-        filepath = os.path.join(self.expense_dir, filename)
-        with open(filepath, "wb") as f:
-            f.write(file_content)
-        return f"02_Expense_Claims/{filename}"
+    def save_expense_receipt(self, file_content, driver_name, vehicle_id, expense_amount):
+        """Saves general expenses to dedicated folder."""
+        try:
+            expense_root = self._get_or_create_subfolder("02_Expense_Claims", self.folder_id)
+            date_str = datetime.now().strftime("%Y-%m-%d")
+            safe_name = "".join([c if c.isalnum() else "_" for c in driver_name])
+            filename = f"{date_str}_{safe_name}_{vehicle_id}_Rs{expense_amount}.jpg"
+            
+            file_metadata = {"name": filename, "parents": [expense_root]}
+            fh = io.BytesIO(file_content)
+            media = MediaIoBaseUpload(fh, mimetype="image/jpeg")
+            file = self.service.files().create(body=file_metadata, media_body=media, fields="webViewLink").execute()
+            return file.get("webViewLink")
+        except Exception:
+            return None
 
     def save_incident_report(self, file_content, driver_name, vehicle_id):
-        date_str = datetime.now().strftime("%Y-%m-%d_%H%M%S")
-        filename = f"{date_str}_{vehicle_id}_Damage.jpg"
-        filepath = os.path.join(self.incident_dir, filename)
-        with open(filepath, "wb") as f:
-            f.write(file_content)
-        return f"04_Incident_Reports/{filename}"
+        """Saves incident reports to dedicated folder."""
+        try:
+            incident_root = self._get_or_create_subfolder("04_Incident_Reports", self.folder_id)
+            date_str = datetime.now().strftime("%Y-%m-%d_%H%M%S")
+            filename = f"{date_str}_{vehicle_id}_Damage.jpg"
+            
+            file_metadata = {"name": filename, "parents": [incident_root]}
+            fh = io.BytesIO(file_content)
+            media = MediaIoBaseUpload(fh, mimetype="image/jpeg")
+            file = self.service.files().create(body=file_metadata, media_body=media, fields="webViewLink").execute()
+            return file.get("webViewLink")
+        except Exception:
+            return None
