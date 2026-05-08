@@ -10,7 +10,11 @@ We have successfully transitioned the Fleet Tracker from a basic prototype to a 
     *   Drivers now simply report the **number of trips** completed during a duty.
     *   Financial calculations are automated via Google Sheets formulas to reduce manual entry errors.
 
-2.  **Professional Reporting Dashboard**:
+2.  **Dual Reporting Models**:
+    *   **Real-Time Mode**: Instant trip logging for agile operations.
+    *   **Bulk Morning/Evening Mode**: Professional workflow for high-volume drivers. Record morning check-in and batch-process all trips in the evening.
+
+3.  **Professional Reporting Dashboard**:
     *   Automated formatting (Navy headers, frozen rows, center alignment).
     *   Real-time KPIs for Net Profit, Fleet Health, and Driver Performance.
     *   Daily summaries generated for every vehicle.

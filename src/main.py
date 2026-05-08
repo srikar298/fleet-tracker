@@ -1,5 +1,6 @@
 import logging
 import os
+import sys
 import warnings
 from typing import Any
 
@@ -44,8 +45,19 @@ from core.states import (
     START_TRIP_LOC,
     START_TRIP_ODO,
     START_TRIP_VEHICLE,
+    BULK_START_ODO,
+    BULK_START_IMAGE,
+    BULK_END_ODO,
+    BULK_END_IMAGE,
+    BULK_TRIP_COUNT,
+    BULK_TRIP_CLIENT,
+    BULK_TRIP_DETAILS,
+    BULK_FUEL_DATA,
+    BULK_EXPENSES,
+    BULK_SUMMARY
 )
 from handlers.admin import AdminHandler
+from handlers.bulk import BulkHandler
 from handlers.incidents import IncidentHandler
 from handlers.registration import RegistrationHandler
 from handlers.trips import TripHandler
@@ -77,6 +89,7 @@ class FleetBot:
         self.inc_handler = IncidentHandler(self.sheets, self.drive, self.attendance)
         self.trip_handler = TripHandler(self.sheets, self.drive, self.attendance)
         self.admin_handler = AdminHandler(self.sheets, self.drive, self.attendance)
+        self.bulk_handler = BulkHandler(self.sheets, self.drive, self.attendance)
         self.backup = BackupService(self.sheets, self.drive)
 
         # Initialize Scheduler for Backups
@@ -90,11 +103,14 @@ class FleetBot:
         """Starts the scheduler and registers bot commands."""
         # 1. Start Background Scheduler
         self.scheduler.start()
-        logger.info("Scheduler started successfully in post_init.")
+        logger.info(f"🚀 FleetTracker starting on Python {sys.version}")
+        logger.info("✅ Scheduler started successfully.")
 
         # 2. Register Bot Commands for the Menu Button
         commands = [
             BotCommand("start", "🚀 Main Menu"),
+            BotCommand("startbulkday", "🌅 Start Day (Morning Odo)"),
+            BotCommand("endbulkday", "🌃 End Day (Bulk Trips)"),
             BotCommand("admin", "👨‍✈️ Admin Center"),
             BotCommand("viewdaily", "📊 Today's Stats"),
             BotCommand("live", "📺 Live Fleet Watch"),
@@ -172,6 +188,7 @@ class FleetBot:
             .post_init(self.post_init)
             .build()
         )
+        logger.info("🤖 Bot application built. Handlers registered.")
         conv_handler = ConversationHandler(
             entry_points=[
                 CommandHandler("start", self.start),
@@ -279,8 +296,6 @@ class FleetBot:
                 CommandHandler("admin", self.admin_handler.admin_menu),
             ],
             allow_reentry=True,
-            name="fleet_conv",
-            persistent=True,
         )
 
         # Admin Commands (Priority)
@@ -298,6 +313,8 @@ class FleetBot:
         application.add_handler(CommandHandler("setprice", self.admin_handler.set_price_cmd))
         application.add_handler(CommandHandler("payroll", self.admin_handler.payroll_cmd))
         application.add_handler(CommandHandler("setsalary", self.admin_handler.set_salary_cmd))
+        application.add_handler(CommandHandler("startbulkday", self.bulk_handler.start_bulk_day))
+        application.add_handler(CommandHandler("endbulkday", self.bulk_handler.end_bulk_day_cmd))
         application.add_handler(CommandHandler("clients", self.admin_handler.list_clients_cmd))
         application.add_handler(CommandHandler("mark", self.admin_handler.mark_attendance_cmd))
 
@@ -308,8 +325,35 @@ class FleetBot:
             )
         )
 
-        application.add_handler(conv_handler)
+        bulk_conv = ConversationHandler(
+            entry_points=[
+                CommandHandler("startbulkday", self.bulk_handler.start_bulk_day),
+                CommandHandler("endbulkday", self.bulk_handler.end_bulk_day_cmd),
+            ],
+            states={
+                BULK_START_ODO: [MessageHandler(filters.TEXT & ~filters.COMMAND, self.bulk_handler.handle_start_odo)],
+                BULK_START_IMAGE: [MessageHandler(filters.PHOTO, self.bulk_handler.handle_start_image)],
+                BULK_END_ODO: [MessageHandler(filters.TEXT & ~filters.COMMAND, self.bulk_handler.handle_end_odo)],
+                BULK_END_IMAGE: [MessageHandler(filters.PHOTO, self.bulk_handler.handle_end_image)],
+                BULK_TRIP_COUNT: [MessageHandler(filters.TEXT & ~filters.COMMAND, self.bulk_handler.handle_trip_count)],
+                BULK_TRIP_CLIENT: [CallbackQueryHandler(self.bulk_handler.handle_trip_client, pattern="^bcli_")],
+                BULK_TRIP_DETAILS: [MessageHandler(filters.TEXT & ~filters.COMMAND, self.bulk_handler.handle_trip_details)],
+                BULK_FUEL_DATA: [MessageHandler(filters.TEXT & ~filters.COMMAND, self.bulk_handler.handle_fuel_data)],
+                BULK_EXPENSES: [MessageHandler(filters.TEXT & ~filters.COMMAND, self.bulk_handler.handle_expenses)],
+                BULK_SUMMARY: [CallbackQueryHandler(self.bulk_handler.handle_bulk_summary, pattern="^bulk_")],
+            },
+            fallbacks=[
+                CommandHandler("cancel", self.cancel),
+                CallbackQueryHandler(self.cancel, pattern="^cancel$")
+            ],
+            allow_reentry=True,
+        )
+        application.add_handler(bulk_conv)
+        application.add_handler(CallbackQueryHandler(self.bulk_handler.handle_start_vehicle, pattern="^bveh_"))
 
+        application.add_handler(conv_handler)
+        
+        logger.info("📡 Bot polling starting... Press Ctrl+C to stop locally.")
         application.run_polling()
 
 
