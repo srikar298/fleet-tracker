@@ -23,11 +23,7 @@ def generate_daily_summary(target_date=None):
         return
 
     # Filter trips by date
-    today_trips = [
-        t
-        for t in all_trips
-        if t.get("Date") == target_date or t.get("date") == target_date
-    ]
+    today_trips = [t for t in all_trips if t.get("Date") == target_date or t.get("date") == target_date]
 
     if not today_trips:
         print("No trips found for today.")
@@ -53,15 +49,9 @@ def generate_daily_summary(target_date=None):
 
         summary_data[vid]["TripsCount"] += 1
         summary_data[vid]["TotalKM"] += float(t.get("Distance", 0))
-        summary_data[vid]["TotalFuelCost"] += float(
-            t.get("Fuel_Cost", 0) or t.get("fuel_cost", 0)
-        )
-        summary_data[vid]["TotalOtherExpenses"] += float(
-            t.get("Other_Expenses", 0) or t.get("other_expenses", 0)
-        )
-        summary_data[vid]["TotalRevenue"] += float(
-            t.get("Revenue", 0) or t.get("revenue", 0)
-        )
+        summary_data[vid]["TotalFuelCost"] += float(t.get("Fuel_Cost", 0) or t.get("fuel_cost", 0))
+        summary_data[vid]["TotalOtherExpenses"] += float(t.get("Other_Expenses", 0) or t.get("other_expenses", 0))
+        summary_data[vid]["TotalRevenue"] += float(t.get("Revenue", 0) or t.get("revenue", 0))
 
         flag = t.get("Flag", "") or t.get("flag", "")
         if flag and "OK" not in flag:
@@ -72,9 +62,7 @@ def generate_daily_summary(target_date=None):
 
     # Write to Daily_Summary sheet
     for vid, data in summary_data.items():
-        net_profit = (
-            data["TotalRevenue"] - data["TotalFuelCost"] - data["TotalOtherExpenses"]
-        )
+        net_profit = data["TotalRevenue"] - data["TotalFuelCost"] - data["TotalOtherExpenses"]
         avg_score = sum(data["Scores"]) / len(data["Scores"]) if data["Scores"] else 100
 
         status = "Good"

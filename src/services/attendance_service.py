@@ -18,16 +18,11 @@ class AttendanceService:
 
         records = sheet.get_all_records()
         for i, record in enumerate(records, start=2):
-            if (
-                str(record.get("DriverID")) == str(driver_id)
-                and record.get("Date") == today
-            ):
+            if str(record.get("DriverID")) == str(driver_id) and record.get("Date") == today:
                 sheet.update_cell(i, 5, now_time)
                 return
 
-        sheet.append_row(
-            [today, driver_id, vendor_id, now_time, now_time, "Present", "", ""]
-        )
+        sheet.append_row([today, driver_id, vendor_id, now_time, now_time, "Present", "", ""])
 
     def get_daily_target(self, driver_id):
         today = datetime.now().strftime("%Y-%m-%d")
@@ -35,10 +30,7 @@ class AttendanceService:
         if not sheet:
             return None
         for record in sheet.get_all_records():
-            if (
-                str(record.get("DriverID")) == str(driver_id)
-                and record.get("Date") == today
-            ):
+            if str(record.get("DriverID")) == str(driver_id) and record.get("Date") == today:
                 t_type = record.get("Target_Type")
                 if t_type:
                     return {
@@ -57,10 +49,7 @@ class AttendanceService:
 
         records = sheet.get_all_records()
         for i, record in enumerate(records, start=2):
-            if (
-                str(record.get("DriverID")) == str(driver_id)
-                and record.get("Date") == today
-            ):
+            if str(record.get("DriverID")) == str(driver_id) and record.get("Date") == today:
                 sheet.update_cell(i, 7, t_type)
                 sheet.update_cell(i, 8, t_value)
                 return

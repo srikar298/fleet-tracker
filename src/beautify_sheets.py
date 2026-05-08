@@ -115,11 +115,7 @@ def beautify():
                         "startColumnIndex": 0,
                         "endColumnIndex": 1,
                     },
-                    "cell": {
-                        "userEnteredFormat": {
-                            "textFormat": {"bold": True, "fontSize": 11}
-                        }
-                    },
+                    "cell": {"userEnteredFormat": {"textFormat": {"bold": True, "fontSize": 11}}},
                     "fields": "userEnteredFormat(textFormat)",
                 }
             }

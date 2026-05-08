@@ -16,34 +16,26 @@ class RegistrationHandler(BaseHandler):
         await update.message.reply_text("Let's register you! What is your Full Name?")  # type: ignore
         return REGISTER_NAME
 
-    async def handle_register_name(
-        self, update: Update, context: ContextTypes.DEFAULT_TYPE
-    ):
+    async def handle_register_name(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
         context.user_data["driver_name"] = update.message.text  # type: ignore
         await update.message.reply_text("Great! Now, what is your Phone Number?")  # type: ignore
         return REGISTER_PHONE
 
-    async def handle_register_phone(
-        self, update: Update, context: ContextTypes.DEFAULT_TYPE
-    ):
+    async def handle_register_phone(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
         context.user_data["driver_phone"] = update.message.text  # type: ignore
         await update.message.reply_text(  # type: ignore
             "Almost done. What is your Driving License Number (or ID)?"
         )
         return REGISTER_LICENSE
 
-    async def handle_register_license(
-        self, update: Update, context: ContextTypes.DEFAULT_TYPE
-    ):
+    async def handle_register_license(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
         context.user_data["license_num"] = update.message.text  # type: ignore
         await update.message.reply_text(  # type: ignore
             "Please upload a PHOTO of your Driving License for KYC compliance:"
         )
         return REGISTER_LICENSE_PHOTO
 
-    async def handle_register_license_photo(
-        self, update: Update, context: ContextTypes.DEFAULT_TYPE
-    ):
+    async def handle_register_license_photo(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
         photo_file = await update.message.photo[-1].get_file()  # type: ignore
         photo_bytes = await photo_file.download_as_bytearray()
 

@@ -10,9 +10,7 @@ load_dotenv()
 def init():
     service = SheetsService()
     if not service.spreadsheet:
-        print(
-            "❌ Could not connect to Spreadsheet. Check your .env and credentials.json"
-        )
+        print("❌ Could not connect to Spreadsheet. Check your .env and credentials.json")
         return
 
     sheets_to_create = {
@@ -91,9 +89,7 @@ def init():
                 ws = service.spreadsheet.worksheet(name)
                 print(f"✅ Sheet '{name}' already exists.")
             except Exception:
-                ws = service.spreadsheet.add_worksheet(
-                    title=name, rows="1000", cols="20"
-                )
+                ws = service.spreadsheet.add_worksheet(title=name, rows="1000", cols="20")
                 print(f"🆕 Created sheet '{name}'.")
 
             # Set headers if empty

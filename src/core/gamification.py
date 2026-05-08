@@ -1,8 +1,6 @@
 class GamificationEngine:
     @staticmethod
-    def generate_progress_bar(
-        current_value: float, target_value: float, target_type: str
-    ) -> str:
+    def generate_progress_bar(current_value: float, target_value: float, target_type: str) -> str:
         """Returns the formatted markdown text for daily progress"""
         if target_value <= 0:
             return ""

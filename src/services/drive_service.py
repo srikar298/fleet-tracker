@@ -14,18 +14,15 @@ class DriveService:
 
         # Scopes for Drive API
         self.scopes = ["https://www.googleapis.com/auth/drive.file"]
-        
+
         json_content = os.getenv("GOOGLE_CREDENTIALS_JSON")
         if json_content:
             import json
+
             info = json.loads(json_content)
-            self.creds = Credentials.from_service_account_info(
-                info, scopes=self.scopes
-            )
+            self.creds = Credentials.from_service_account_info(info, scopes=self.scopes)
         else:
-            self.creds = Credentials.from_service_account_file(
-                self.credentials_file, scopes=self.scopes
-            )
+            self.creds = Credentials.from_service_account_file(self.credentials_file, scopes=self.scopes)
         self.service = build("drive", "v3", credentials=self.creds)
 
         # Cache for subfolders to avoid redundant API calls
@@ -41,9 +38,7 @@ class DriveService:
             f"name = '{name}' and '{parent_id}' in parents and "
             f"mimeType = 'application/vnd.google-apps.folder' and trashed = false"
         )
-        results = (
-            self.service.files().list(q=query, fields="files(id, name)").execute()
-        )
+        results = self.service.files().list(q=query, fields="files(id, name)").execute()
         files = results.get("files", [])
 
         if files:
@@ -54,11 +49,7 @@ class DriveService:
                 "mimeType": "application/vnd.google-apps.folder",
                 "parents": [parent_id],
             }
-            folder = (
-                self.service.files()
-                .create(body=file_metadata, fields="id")
-                .execute()
-            )
+            folder = self.service.files().create(body=file_metadata, fields="id").execute()
             folder_id = folder.get("id")
 
         self._folder_cache[cache_key] = folder_id
@@ -72,9 +63,7 @@ class DriveService:
 
             # Navigate/Create hierarchy: Root -> Date -> Driver -> TripID
             date_folder = self._get_or_create_subfolder(date_str, self.folder_id)
-            driver_folder = self._get_or_create_subfolder(
-                safe_driver_name, date_folder
-            )
+            driver_folder = self._get_or_create_subfolder(safe_driver_name, date_folder)
             trip_folder = self._get_or_create_subfolder(trip_id, driver_folder)
 
             filename = f"{image_type}.jpg"
@@ -83,11 +72,7 @@ class DriveService:
             fh = io.BytesIO(file_content)
             media = MediaIoBaseUpload(fh, mimetype="image/jpeg", resumable=True)
 
-            file = (
-                self.service.files()
-                .create(body=file_metadata, media_body=media, fields="id, webViewLink")
-                .execute()
-            )
+            file = self.service.files().create(body=file_metadata, media_body=media, fields="id, webViewLink").execute()
 
             # Make file viewable by anyone with the link (optional, depends on security needs)
             # For B2B transparency, we usually want the link to be accessible
@@ -110,17 +95,16 @@ class DriveService:
             driver_folder = self._get_or_create_subfolder(
                 "".join([c if c.isalnum() else "_" for c in driver_name]), date_folder
             )
-            
+
             # Find the trip folder
             query = f"name = '{trip_id}' and '{driver_folder}' in parents and trashed = false"
             results = self.service.files().list(q=query, fields="files(id)").execute()
             files = results.get("files", [])
-            
+
             if files:
                 folder_id = files[0]["id"]
                 self.service.files().update(
-                    fileId=folder_id,
-                    body={"description": "FLAGGED_FOR_REVIEW: Discrepancy detected"}
+                    fileId=folder_id, body={"description": "FLAGGED_FOR_REVIEW: Discrepancy detected"}
                 ).execute()
                 return True
         except Exception as e:
@@ -133,11 +117,11 @@ class DriveService:
             kyc_root = self._get_or_create_subfolder("03_Compliance_KYC", self.folder_id)
             safe_name = "".join([c if c.isalnum() else "_" for c in driver_name])
             filename = f"{safe_name}_License.jpg"
-            
+
             file_metadata = {"name": filename, "parents": [kyc_root]}
             fh = io.BytesIO(file_content)
             media = MediaIoBaseUpload(fh, mimetype="image/jpeg")
-            
+
             file = self.service.files().create(body=file_metadata, media_body=media, fields="webViewLink").execute()
             return file.get("webViewLink")
         except Exception:
@@ -147,23 +131,23 @@ class DriveService:
         """Saves fuel receipt both in trip folder and financial reconciliation folder."""
         # 1. Standard upload
         web_link = self.upload_file(file_content, driver_name, trip_id, "fuel_receipt")
-        
+
         # 2. Duplicate to Finance folder for accounting
         try:
             finance_root = self._get_or_create_subfolder("01_Financial_Reconciliation", self.folder_id)
             month_str = datetime.now().strftime("%Y-%m")
             month_folder = self._get_or_create_subfolder(month_str, finance_root)
-            
+
             date_str = datetime.now().strftime("%Y-%m-%d")
             filename = f"{date_str}_{vehicle_id}_Rs{cost}.jpg"
-            
+
             file_metadata = {"name": filename, "parents": [month_folder]}
             fh = io.BytesIO(file_content)
             media = MediaIoBaseUpload(fh, mimetype="image/jpeg")
             self.service.files().create(body=file_metadata, media_body=media).execute()
         except Exception:
             pass
-            
+
         return web_link
 
     def save_expense_receipt(self, file_content, driver_name, vehicle_id, expense_amount):
@@ -173,7 +157,7 @@ class DriveService:
             date_str = datetime.now().strftime("%Y-%m-%d")
             safe_name = "".join([c if c.isalnum() else "_" for c in driver_name])
             filename = f"{date_str}_{safe_name}_{vehicle_id}_Rs{expense_amount}.jpg"
-            
+
             file_metadata = {"name": filename, "parents": [expense_root]}
             fh = io.BytesIO(file_content)
             media = MediaIoBaseUpload(fh, mimetype="image/jpeg")
@@ -188,7 +172,7 @@ class DriveService:
             incident_root = self._get_or_create_subfolder("04_Incident_Reports", self.folder_id)
             date_str = datetime.now().strftime("%Y-%m-%d_%H%M%S")
             filename = f"{date_str}_{vehicle_id}_Damage.jpg"
-            
+
             file_metadata = {"name": filename, "parents": [incident_root]}
             fh = io.BytesIO(file_content)
             media = MediaIoBaseUpload(fh, mimetype="image/jpeg")

@@ -10,9 +10,7 @@ logger = logging.getLogger(__name__)
 class BaseHandler:
     """Base class for all Telegram handlers, providing injected services."""
 
-    def __init__(
-        self, sheets: SheetsService, drive: DriveService, attendance: AttendanceService
-    ):
+    def __init__(self, sheets: SheetsService, drive: DriveService, attendance: AttendanceService):
         self.sheets = sheets
         self.drive = drive
         self.attendance = attendance
