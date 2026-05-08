@@ -122,14 +122,20 @@ class FleetBot:
     async def today_summary_cmd(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
         summary = self.sheets.get_driver_today_summary(update.effective_user.id)  # type: ignore
         is_admin = self.is_admin(update.effective_user.id)
+        trip_details = ""
+        if summary.get("trip_list"):
+            trip_details = "\n*Trip History*:\n"
+            for i, d in enumerate(summary["trip_list"], 1):
+                trip_details += f" {i}. `{d} KM`\n"
+
         text = (
             f"📊 *Today's Summary*\n"
-            f"Trips: {summary['trips']}\n"
-            f"KM: {summary['km']} km\n"
-            f"Fuel: ₹{summary['fuel']}\n"
-            f"Revenue: ₹{summary['revenue']}\n"
-            f"------------\n"
-            f"Net: ₹{summary['net']}"
+            f"━━━━━━━━━━━━━━━━━━━━\n"
+            f"✅ Trips: `{summary['trips']}`\n"
+            f"🛣 Total KM: `{summary['km']:.1f} KM`\n"
+            f"⛽ Spent: `₹{summary['fuel']}`\n"
+            f"{trip_details}"
+            f"━━━━━━━━━━━━━━━━━━━━"
         )
         await update.message.reply_text(  # type: ignore
             text, parse_mode="Markdown", reply_markup=get_main_menu(is_admin)

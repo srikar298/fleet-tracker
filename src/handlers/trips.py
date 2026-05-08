@@ -574,11 +574,13 @@ class TripHandler(BaseHandler):
             self._clear_trip_data(context)
 
     def _clear_trip_data(self, context: ContextTypes.DEFAULT_TYPE):
-        """Resets all trip-related data in the user session."""
+        """Resets trip-specific data but keeps vehicle and last odo for carry-over."""
+        if "end_odo" in context.user_data:
+            context.user_data["last_odo"] = context.user_data["end_odo"]
+
         keys_to_clear = [
             "active_trip",
             "trip_id",
-            "vehicle_id",
             "start_odo",
             "end_odo",
             "start_image_url",
@@ -594,7 +596,8 @@ class TripHandler(BaseHandler):
             "distance",
             "net",
         ]
+        # NOTE: We do NOT clear vehicle_id here so it carries over to the next trip!
         for key in keys_to_clear:
             if key in context.user_data:
                 del context.user_data[key]
-        logger.info("🧹 Session cleared for new trip.")
+        logger.info("🧹 Session prepared for next trip (Vehicle & Odo preserved).")

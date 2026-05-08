@@ -162,13 +162,16 @@ class SheetsService:
         km = 0.0
         fuel = 0.0
         revenue = 0.0
+        trip_list = []
 
         for r in records:
             # Match date and driver
             if (r.get("Date") == today or r.get("date") == today) and str(r.get("DriverID")) == str(driver_id):
                 trips += 1
                 try:
-                    km += float(r.get("Distance") or r.get("distance") or 0)
+                    d = float(r.get("Distance") or r.get("distance") or 0)
+                    km += d
+                    trip_list.append(d)
                 except (ValueError, TypeError):
                     pass
                 try:
@@ -192,6 +195,7 @@ class SheetsService:
             "fuel": fuel,
             "revenue": revenue,
             "net": revenue - fuel,
+            "trip_list": trip_list,
         }
 
     def get_live_leaderboard(self):
