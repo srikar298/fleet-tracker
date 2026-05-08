@@ -496,9 +496,10 @@ class TripHandler(BaseHandler):
                 "Idle",
             )
 
+            is_admin = self.is_admin(update.effective_user.id)
             await update.effective_message.reply_text(  # type: ignore
                 f"✅ Trip successfully recorded in the ledger!\nTrip ID: {trip_id}",
-                reply_markup=get_main_menu(),
+                reply_markup=get_main_menu(is_admin),
             )
         except Exception as e:
             logger.error(f"Error completing trip: {e}")

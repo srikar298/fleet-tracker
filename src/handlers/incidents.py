@@ -42,8 +42,9 @@ class IncidentHandler(BaseHandler):
 
         self.drive.save_incident_report(photo_bytes, driver_name, v_id)
 
+        is_admin = self.is_admin(update.effective_user.id)
         await update.message.reply_text(  # type: ignore
             "✅ Incident reported and saved for insurance/audit.",
-            reply_markup=get_main_menu(),
+            reply_markup=get_main_menu(is_admin),
         )
         return ConversationHandler.END

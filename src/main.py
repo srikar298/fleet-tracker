@@ -61,6 +61,7 @@ load_dotenv()
 class FleetBot:
     def __init__(self):
         self.token = os.getenv("TELEGRAM_BOT_TOKEN")
+        self.admin_ids = [int(i.strip()) for i in os.getenv("ADMIN_IDS", "").split(",") if i.strip()]
 
         # Initialize Core Services (Dependency Injection)
         self.sheets = SheetsService()
@@ -74,6 +75,9 @@ class FleetBot:
         self.admin_handler = AdminHandler(self.sheets, self.drive, self.attendance)
         self.backup = BackupService(self.sheets, self.drive)
 
+    def is_admin(self, user_id):
+        return user_id in self.admin_ids
+
         # Initialize Scheduler for Backups
         self.scheduler = AsyncIOScheduler()
         self.scheduler.add_job(self.backup.run_daily_backup, "cron", hour=0, minute=0)
@@ -84,19 +88,22 @@ class FleetBot:
         logger.info("Scheduler started successfully in post_init.")
 
     async def start(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
+        is_admin = self.is_admin(update.effective_user.id)
         await update.message.reply_text(  # type: ignore
             "Welcome to FleetTracker! 🚛\nUse the menu below to navigate.",
-            reply_markup=get_main_menu(),
+            reply_markup=get_main_menu(is_admin),
         )
 
     async def cancel(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
+        is_admin = self.is_admin(update.effective_user.id)
         await update.message.reply_text(  # type: ignore
-            "Operation cancelled.", reply_markup=get_main_menu()
+            "Operation cancelled.", reply_markup=get_main_menu(is_admin)
         )
         return ConversationHandler.END
 
     async def today_summary_cmd(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
         summary = self.sheets.get_driver_today_summary(update.effective_user.id)  # type: ignore
+        is_admin = self.is_admin(update.effective_user.id)
         text = (
             f"📊 *Today's Summary*\n"
             f"Trips: {summary['trips']}\n"
@@ -107,15 +114,16 @@ class FleetBot:
             f"Net: ₹{summary['net']}"
         )
         await update.message.reply_text(  # type: ignore
-            text, parse_mode="Markdown", reply_markup=get_main_menu()
+            text, parse_mode="Markdown", reply_markup=get_main_menu(is_admin)
         )
         return ConversationHandler.END
 
     async def leaderboard_cmd(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
+        is_admin = self.is_admin(update.effective_user.id)
         await update.message.reply_text("Fetching live leaderboard... 🔄")  # type: ignore
         lb_text = self.sheets.get_live_leaderboard()
         await update.message.reply_text(  # type: ignore
-            lb_text, parse_mode="Markdown", reply_markup=get_main_menu()
+            lb_text, parse_mode="Markdown", reply_markup=get_main_menu(is_admin)
         )
         return ConversationHandler.END
 
@@ -133,6 +141,7 @@ class FleetBot:
                 MessageHandler(filters.Regex("^🛑 End Trip$"), self.trip_handler.end_trip_cmd),
                 MessageHandler(filters.Regex("^📊 Today Summary$"), self.today_summary_cmd),
                 MessageHandler(filters.Regex("^🏆 Leaderboard$"), self.leaderboard_cmd),
+                MessageHandler(filters.Regex("^👨‍✈️ Admin Panel$"), self.admin_handler.admin_menu),
                 MessageHandler(
                     filters.Regex("^⚠️ Report Damage$"),
                     self.inc_handler.report_damage_cmd,
