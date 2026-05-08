@@ -544,12 +544,17 @@ class TripHandler(BaseHandler):
             summary = self.sheets.get_driver_today_summary(update.effective_user.id)
             trips_done = summary["trips"]
             target = 5
-            
+
+            # Fetch Financial Summary for Gamification
+            fin = self.sheets.get_driver_financial_summary(update.effective_user.id)
+            earnings_text = f"\n💰 **Today's Earnings**: `₹{fin['today']}`\n📈 **Monthly Progress**: `₹{fin['monthly']} / ₹{fin['base']}`"
+
             if trips_done >= target:
                 text = (
                     "🏆 *Daily Goal Reached!* 🏆\n"
                     "━━━━━━━━━━━━━━━━━━━━\n"
-                    f"That was trip number **{trips_done}** today! Excellent work.\n\n"
+                    f"That was trip number **{trips_done}** today! Excellent work.\n"
+                    f"{earnings_text}\n\n"
                     "You've smashed your target. Do you want to keep going for extra rewards?"
                 )
                 await update.effective_message.reply_text(
@@ -563,7 +568,8 @@ class TripHandler(BaseHandler):
                     "✅ *Trip Recorded!* ✅\n"
                     "━━━━━━━━━━━━━━━━━━━━\n"
                     f"Great job! That was your **{trips_done}{ordinal}** trip today.\n"
-                    f"🚀 **{trips_left}** more to go to reach your daily goal of {target}!\n\n"
+                    f"🚀 **{trips_left}** more to go to reach your daily goal of {target}!\n"
+                    f"{earnings_text}\n\n"
                     f"_Trip ID: {trip_id}_"
                 )
                 await update.effective_message.reply_text(

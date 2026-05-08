@@ -1,4 +1,5 @@
 import os
+from datetime import datetime
 from typing import Any, Dict, List, Optional
 
 import gspread
@@ -334,3 +335,34 @@ class SheetsService:
                 report.append({"id": v_id, "kml": kml, "total_km": stats["dist"]})
 
         return sorted(report, key=lambda x: x["kml"], reverse=True)
+
+    def get_driver_financial_summary(self, driver_id: str | int) -> dict[str, Any]:
+        """Fetches today's earnings and monthly running total for a driver."""
+        today = datetime.now().strftime("%Y-%m-%d")
+        month = today[:7]
+        
+        att_ws = self.get_sheet("Attendance")
+        pay_ws = self.get_sheet("Monthly_Payroll")
+        
+        today_earnings = 0.0
+        monthly_total = 0.0
+        
+        if att_ws:
+            recs = att_ws.get_all_records()
+            for r in recs:
+                if str(r.get("DriverID")) == str(driver_id) and str(r.get("Date")) == today:
+                    today_earnings = float(r.get("Daily_Earnings") or 0)
+                    break
+        
+        if pay_ws:
+            p_recs = pay_ws.get_all_records()
+            for pr in p_recs:
+                if str(pr.get("DriverID")) == str(driver_id) and str(pr.get("Month")) == month:
+                    monthly_total = float(pr.get("Net_Payout") or 0)
+                    break
+                    
+        return {
+            "today": round(today_earnings, 2),
+            "monthly": round(monthly_total, 2),
+            "base": 27000.0
+        }

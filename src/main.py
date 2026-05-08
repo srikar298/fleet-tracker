@@ -143,11 +143,16 @@ class FleetBot:
             for i, d in enumerate(summary["trip_list"], 1):
                 trip_details += f" {i}. `{d} KM`\n"
 
+        # Financial Summary
+        fin = self.sheets.get_driver_financial_summary(update.effective_user.id)
+
         text = (
             f"📊 *Today's Performance Summary*\n"
             f"━━━━━━━━━━━━━━━━━━━━\n"
             f"✅ Total Trips: `{summary['trips']}`\n"
             f"🛣 Total Distance: `{summary['km']:.1f} KM`\n"
+            f"💰 Today's Earnings: `₹{fin['today']}`\n"
+            f"📈 Monthly Progress: `₹{fin['monthly']} / ₹{fin['base']}`\n"
             f"{trip_details}"
             f"━━━━━━━━━━━━━━━━━━━━"
         )
