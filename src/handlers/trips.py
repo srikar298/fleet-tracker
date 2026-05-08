@@ -47,7 +47,7 @@ class TripHandler(BaseHandler):
             # Default to 5 Trips as requested
             self.attendance.set_daily_target(
                 update.effective_user.id,
-                "V-MASTER",
+                "C-XGAT",
                 "Trips",
                 5.0,
             )
@@ -191,7 +191,7 @@ class TripHandler(BaseHandler):
         context.user_data["start_time"] = datetime.now()
         context.user_data["active_trip"] = True
 
-        self.attendance.log_activity(update.effective_user.id, "V-MASTER")
+        self.attendance.log_activity(update.effective_user.id, "C-XGAT")
         self.sheets.update_vehicle_status(
             str(context.user_data["vehicle_id"]),
             context.user_data["start_odo"],
@@ -496,16 +496,16 @@ class TripHandler(BaseHandler):
                     trip_id,
                 )
 
-            # Fetch B2B Rates from Master_Vendors
+            # Fetch B2B Rates from Master_Clients
             driver_info = self.sheets.get_driver_by_id(update.effective_user.id)
-            vendor_id = str(driver_info.get("VendorID", "V-MASTER")) if driver_info else "V-MASTER"
-            rates = self.sheets.get_vendor_rates(vendor_id)
+            client_id = str(driver_info.get("ClientID", "C-XGAT")) if driver_info else "C-XGAT"
+            rates = self.sheets.get_client_rates(client_id)
 
             trip_record: dict[str, Any] = {
                 "trip_id": trip_id,
                 "date": date,
                 "client_name": rates["client_name"],
-                "vendor_id": vendor_id,
+                "client_id": client_id,
                 "driver_id": update.effective_user.id,
                 "vehicle_id": context.user_data.get("vehicle_id", "Unknown"),
                 "start_time": start_time.strftime("%H:%M:%S"),

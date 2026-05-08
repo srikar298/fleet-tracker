@@ -16,17 +16,17 @@ def init() -> None:
 
     sheets_to_create = {
         "Dashboard": ["Metric", "Value", "Unit"],
-        "Master_Vehicles": ["VehicleID", "LicensePlate", "VendorID", "Last_Odometer", "Status"],
-        "Master_Drivers": ["DriverID", "Name", "License", "VendorID", "Phone", "Status"],
-        "Master_Vendors": ["VendorID", "Vendor_Name", "Default_Client", "Client_Billed_Per_Trip", "Driver_Payout_Per_Trip"],
+        "Master_Vehicles": ["VehicleID", "LicensePlate", "ClientID", "Last_Odometer", "Status"],
+        "Master_Drivers": ["DriverID", "Name", "License", "ClientID", "Phone", "Status"],
+        "Master_Clients": ["ClientID", "Client_Name", "Contract_Type", "Client_Billed_Per_Trip", "Driver_Payout_Per_Trip"],
         "Trips": [
-            "TripID", "Date", "Client_Name", "VendorID", "DriverID", "VehicleID", 
+            "TripID", "Date", "Client_Name", "ClientID", "DriverID", "VehicleID", 
             "Start_Time", "End_Time", "Duration_Mins", "Start_Location", "End_Location", 
             "Start_Odometer", "End_Odometer", "Distance", "Fuel_Liters", "Fuel_Cost", 
             "Other_Expenses", "Client_Billed_Amount", "Driver_Payout_Amount", "Gross_Margin", 
             "Net_Margin_Percentage", "Driver_Score", "Start_Image", "End_Image", "Receipt_Image", "Flag", "Remarks"
         ],
-        "Attendance": ["Date", "DriverID", "VendorID", "First_CheckIn", "Last_Activity", "Status", "Target_Type", "Target_Value"],
+        "Attendance": ["Date", "DriverID", "ClientID", "First_CheckIn", "Last_Activity", "Status", "Target_Type", "Target_Value"],
         "Daily_Summary": ["Date", "VehicleID", "DriverID", "TripsCount", "TotalKM", "TotalFuelCost", "TotalOtherExpenses", "TotalBilled", "TotalPayout", "NetMargin", "FlagsCount", "DriverScoreAvg", "Status"],
     }
 

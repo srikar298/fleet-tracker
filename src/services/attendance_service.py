@@ -8,7 +8,7 @@ class AttendanceService:
     def __init__(self, sheets_service: SheetsService) -> None:
         self.sheets = sheets_service
 
-    def log_activity(self, driver_id: str | int, vendor_id: str) -> None:
+    def log_activity(self, driver_id: str | int, client_id: str) -> None:
         """Logs the first check-in or updates the last activity for a driver"""
         today = datetime.now().strftime("%Y-%m-%d")
         now_time = datetime.now().strftime("%H:%M:%S")
@@ -23,7 +23,7 @@ class AttendanceService:
                 sheet.update_cell(i, 5, now_time)
                 return
 
-        sheet.append_row([today, driver_id, vendor_id, now_time, now_time, "Present", "", ""])
+        sheet.append_row([today, driver_id, client_id, now_time, now_time, "Present", "", ""])
 
     def get_daily_target(self, driver_id: str | int) -> dict[str, Any] | None:
         today = datetime.now().strftime("%Y-%m-%d")
@@ -45,7 +45,7 @@ class AttendanceService:
                 return None
         return None
 
-    def set_daily_target(self, driver_id: str | int, vendor_id: str, t_type: str, t_value: float) -> None:
+    def set_daily_target(self, driver_id: str | int, client_id: str, t_type: str, t_value: float) -> None:
         today = datetime.now().strftime("%Y-%m-%d")
         now_time = datetime.now().strftime("%H:%M:%S")
         sheet = self.sheets.get_sheet("Attendance")
@@ -64,7 +64,7 @@ class AttendanceService:
             [
                 today,
                 driver_id,
-                vendor_id,
+                client_id,
                 now_time,
                 now_time,
                 "Present",
