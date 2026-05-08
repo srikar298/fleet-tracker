@@ -147,25 +147,39 @@ class TripHandler(BaseHandler):
             return START_TRIP_ODO
 
     async def handle_start_image(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
+        from telegram import KeyboardButton, ReplyKeyboardMarkup
+
         photo_file = await update.message.photo[-1].get_file()  # type: ignore
         photo_bytes = await photo_file.download_as_bytearray()
 
         driver_name = update.effective_user.first_name  # type: ignore
         trip_id = context.user_data.setdefault("trip_id", str(uuid.uuid4())[:8])  # type: ignore
-        url = self.drive.upload_file(photo_bytes, driver_name, trip_id, "start_odo")
+        url = self.drive.save_trip_image(
+            photo_bytes,
+            driver_name,
+            trip_id,
+            "start",
+            context.user_data.get("vehicle_id", "Unknown"),  # type: ignore
+        )
         context.user_data["start_image_url"] = url  # type: ignore
 
-        await update.message.reply_text("Share your CURRENT LOCATION (📎 -> Location):")  # type: ignore
+        # Use Native Location Request
+        keyboard = [[KeyboardButton("📍 Share Current Location", request_location=True)]]
+        await update.message.reply_text(  # type: ignore
+            "Perfect! Now tap the button below to share your **Live Pickup Location**:",
+            parse_mode="Markdown",
+            reply_markup=ReplyKeyboardMarkup(keyboard, one_time_keyboard=True, resize_keyboard=True),
+        )
         return START_TRIP_LOC
 
     async def handle_start_loc(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
-        loc = update.message.location  # type: ignore
-        if loc:
-            context.user_data["start_location"] = (  # type: ignore
-                f"https://maps.google.com/?q={loc.latitude},{loc.longitude}"
-            )
-        else:
-            context.user_data["start_location"] = "Manual: " + update.message.text  # type: ignore
+        location = update.message.location
+        if not location:
+            await update.message.reply_text("Please use the button to share your location.")
+            return START_TRIP_LOC
+
+        loc_str = f"{location.latitude}, {location.longitude}"
+        context.user_data["start_location"] = loc_str
 
         context.user_data["start_time"] = datetime.now()  # type: ignore
         context.user_data["active_trip"] = True  # type: ignore
@@ -177,33 +191,35 @@ class TripHandler(BaseHandler):
             "On Trip",  # type: ignore
         )
 
-        await update.message.reply_text(  # type: ignore
-            f"Trip STARTED ✅\nVehicle: {context.user_data['vehicle_id']}\n"  # type: ignore
-            f"Start KM: {context.user_data['start_odo']}\n"  # type: ignore
-            f"Time: {context.user_data['start_time'].strftime('%I:%M %p')}\n\n"  # type: ignore
-            "Drive safe!",
-            reply_markup=get_main_menu(),
+        is_admin = self.is_admin(update.effective_user.id)
+        await update.message.reply_text(
+            "✅ Location Verified! Drive safe. Trip has started.", reply_markup=get_main_menu(is_admin)
         )
         return ConversationHandler.END
 
     # --- END TRIP FLOW ---
     async def end_trip_cmd(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
-        if (
-            not context.user_data.get("active_trip")  # type: ignore
-            and "vehicle_id" not in context.user_data  # type: ignore
-        ):
-            vehicles = self.sheets.get_all_vehicles()
-            keyboard = [[InlineKeyboardButton(v["plate"], callback_data=f"veh_{v['id']}")] for v in vehicles]
-            keyboard.append([InlineKeyboardButton("❌ Cancel", callback_data="cancel")])
-            await update.message.reply_text(  # type: ignore
-                "Which vehicle are you ending the trip for?",
-                reply_markup=InlineKeyboardMarkup(keyboard),
-            )
-            return END_TRIP_VEHICLE
+        if not context.user_data.get("active_trip"):  # type: ignore
+            await update.message.reply_text("⚠️ You don't have an active trip to end.")  # type: ignore
+            return ConversationHandler.END
 
-        v_id = context.user_data.get("vehicle_id", "Unknown")  # type: ignore
-        await update.message.reply_text(f"Ending trip for {v_id}. Enter END Odometer:")  # type: ignore
-        return END_TRIP_ODO
+        # Auto-detect vehicle_id from active trip
+        v_id = context.user_data.get("vehicle_id")
+        if v_id:
+            context.user_data["vehicle_id"] = v_id
+            await update.message.reply_text(f"🏁 Ending trip for vehicle: **{v_id}**", parse_mode="Markdown")
+            await update.message.reply_text("Enter current ODOMETER reading:")
+            return END_TRIP_ODO
+
+        # Fallback if vehicle_id was lost (unlikely with persistence)
+        vehicles = self.sheets.get_all_vehicles()
+        keyboard = [[InlineKeyboardButton(v["plate"], callback_data=f"endveh_{v['id']}")] for v in vehicles]
+        keyboard.append([InlineKeyboardButton("❌ Cancel", callback_data="cancel")])
+        await update.message.reply_text(
+            "Which vehicle are you ending the trip for?",
+            reply_markup=InlineKeyboardMarkup(keyboard),
+        )
+        return END_TRIP_VEHICLE
 
     async def handle_end_vehicle(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
         query = update.callback_query
@@ -212,7 +228,7 @@ class TripHandler(BaseHandler):
             await query.edit_message_text("Cancelled.")  # type: ignore
             return ConversationHandler.END
 
-        context.user_data["vehicle_id"] = query.data.replace("veh_", "")  # type: ignore
+        context.user_data["vehicle_id"] = query.data.replace("endveh_", "")  # type: ignore
         await query.edit_message_text(  # type: ignore
             f"Ending trip for {context.user_data['vehicle_id']}. Enter END Odometer:"  # type: ignore
         )
@@ -229,25 +245,40 @@ class TripHandler(BaseHandler):
             return END_TRIP_ODO
 
     async def handle_end_image(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
+        from telegram import KeyboardButton, ReplyKeyboardMarkup
+
         photo_file = await update.message.photo[-1].get_file()  # type: ignore
         photo_bytes = await photo_file.download_as_bytearray()
 
         driver_name = update.effective_user.first_name  # type: ignore
-        trip_id = context.user_data.setdefault("trip_id", str(uuid.uuid4())[:8])  # type: ignore
-        url = self.drive.upload_file(photo_bytes, driver_name, trip_id, "end_odo")
+        trip_id = context.user_data.get("trip_id", "Unknown")  # type: ignore
+        url = self.drive.save_trip_image(
+            photo_bytes,
+            driver_name,
+            trip_id,
+            "end",
+            context.user_data.get("vehicle_id", "Unknown"),  # type: ignore
+        )
         context.user_data["end_image_url"] = url  # type: ignore
 
-        await update.message.reply_text("Share your END LOCATION (📎 -> Location):")  # type: ignore
+        # Use Native Location Request
+        keyboard = [[KeyboardButton("📍 Share Drop-off Location", request_location=True)]]
+        await update.message.reply_text(  # type: ignore
+            "Now tap the button below to share your **Live Drop-off Location**:",
+            parse_mode="Markdown",
+            reply_markup=ReplyKeyboardMarkup(keyboard, one_time_keyboard=True, resize_keyboard=True),
+        )
         return END_TRIP_LOC
 
     async def handle_end_loc(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
-        loc = update.message.location  # type: ignore
-        if loc:
-            context.user_data["end_location"] = (  # type: ignore
-                f"https://maps.google.com/?q={loc.latitude},{loc.longitude}"
-            )
-        else:
-            context.user_data["end_location"] = "Manual: " + update.message.text  # type: ignore
+        location = update.message.location
+        if not location:
+            await update.message.reply_text("Please use the button to share your location.")
+            return END_TRIP_LOC
+
+        loc_str = f"{location.latitude}, {location.longitude}"
+        context.user_data["end_location"] = loc_str
+        await update.message.reply_text("Location captured! 📍")
 
         context.user_data["end_time"] = datetime.now()  # type: ignore
 
