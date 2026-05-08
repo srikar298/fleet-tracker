@@ -561,10 +561,24 @@ class TripHandler(BaseHandler):
             )
 
             is_admin = self.is_admin(update.effective_user.id)
-            await update.effective_message.reply_text(  # type: ignore
-                f"✅ Trip successfully recorded in the ledger!\nTrip ID: {trip_id}",
-                reply_markup=get_main_menu(is_admin),
-            )
+
+            # Milestone Check
+            summary = self.sheets.get_driver_today_summary(update.effective_user.id)
+            if summary["trips"] == 5:
+                text = (
+                    "🏆 *Target Reached!* 🏆\n"
+                    "━━━━━━━━━━━━━━━━━━━━\n"
+                    "You have successfully completed **5 trips** today! Excellent work.\n\n"
+                    "Do you want to continue and make more trips for extra earnings?"
+                )
+                await update.effective_message.reply_text(
+                    text, parse_mode="Markdown", reply_markup=get_main_menu(is_admin)
+                )
+            else:
+                await update.effective_message.reply_text(  # type: ignore
+                    f"✅ Trip successfully recorded in the ledger!\nTrip ID: {trip_id}",
+                    reply_markup=get_main_menu(is_admin),
+                )
         except Exception as e:
             logger.error(f"Error completing trip: {e}")
             await update.effective_message.reply_text(  # type: ignore
