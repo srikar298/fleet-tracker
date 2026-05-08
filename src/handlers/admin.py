@@ -215,25 +215,22 @@ class AdminHandler(BaseHandler):
             tid = data.replace("drv_", "")
             # Fetch driver details
             drivers = self.sheets.get_records_safe("Master_Drivers")
-            driver = next((d for d in drivers if str(d.get("DriverID")) == tid), None)
-            if driver:
+            d = next((d for d in drivers if str(d.get("DriverID")) == tid), None)
+            if d:
                 text = (
-                    f"👤 *Driver Profile*\n"
-                    f"━━━━━━━━━━━━━━━━━━━━\n"
-                    f"*Name*: {driver.get('Name')}\n"
-                    f"*ID*: `{tid}`\n"
-                    f"*Phone*: {driver.get('Phone')}\n"
-                    f"*Status*: {driver.get('Status')}\n\n"
-                    f"Action required?"
+                    f"👤 **Driver**: {d.get('Name')}\n"
+                    f"🆔 **ID**: `{d.get('DriverID')}`\n"
+                    f"📞 **Phone**: [+{d.get('Phone')}](tel:{d.get('Phone')})\n"
+                    f"📄 **License**: `{d.get('License')}`\n"
+                    f"🏢 **Client**: `{d.get('ClientID')}`\n"
+                    f"💰 **Base Salary**: ₹{d.get('Base_Salary', 27000)}\n"
+                    f"🚦 **Status**: {d.get('Status')}"
                 )
                 keyboard = [
-                    [
-                        InlineKeyboardButton("📞 Call Driver", url=f"tel:{driver.get('Phone')}"),
-                        InlineKeyboardButton("🔙 Back", callback_data="back_to_drivers"),
-                    ]
+                    [InlineKeyboardButton("⬅️ Back to Drivers", callback_data="admin_view_drivers")]
                 ]
                 await query.edit_message_text(text, parse_mode="Markdown", reply_markup=InlineKeyboardMarkup(keyboard))
-        elif data == "back_to_drivers":
+        elif data in ["back_to_drivers", "admin_view_drivers"]:
             await self.view_drivers(update, context)
         elif data.startswith("approve_") or data.startswith("reject_"):
             # Handle expense approval
