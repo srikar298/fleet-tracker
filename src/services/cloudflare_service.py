@@ -188,3 +188,11 @@ class CloudflareR2Service:
         except Exception as e:
             logger.error(f"❌ Error generating ZIP: {e}")
             return None
+
+    def flag_trip_images(self, date_str, driver_name, trip_id):
+        """Flags trip images for audit by logging them."""
+        # In R2 we just log the flagging event as we don't have 'starring'
+        prefix = f"trips/{date_str}/{driver_name}/{trip_id}"
+        logger.warning(f"🚩 Trip Flagged for Audit: {prefix}")
+        # Optionally, we could copy these to a 'flagged/' folder here
+        return True
