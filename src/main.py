@@ -90,6 +90,7 @@ class FleetBot:
         commands = [
             BotCommand("start", "🚀 Main Menu"),
             BotCommand("admin", "👨‍✈️ Admin Command Center"),
+            BotCommand("viewdaily", "📊 Today's Stats"),
             BotCommand("cancel", "❌ Cancel Current Action"),
         ]
         await application.bot.set_my_commands(commands)
@@ -256,9 +257,9 @@ class FleetBot:
 
         # Admin Commands (Priority)
         application.add_handler(CommandHandler("admin", self.admin_handler.admin_menu))
-        application.add_handler(CommandHandler("view_daily", self.admin_handler.view_daily_stats))
-        application.add_handler(CommandHandler("view_fuel", self.admin_handler.view_fuel_stats))
-        application.add_handler(CommandHandler("download_photos", self.admin_handler.download_photos))
+        application.add_handler(CommandHandler("viewdaily", self.admin_handler.view_daily_stats))
+        application.add_handler(CommandHandler("viewfuel", self.admin_handler.view_fuel_stats))
+        application.add_handler(CommandHandler("downloadphotos", self.admin_handler.download_photos))
 
         application.add_handler(conv_handler)
 

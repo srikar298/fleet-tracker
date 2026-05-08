@@ -23,10 +23,11 @@ class AdminHandler(BaseHandler):
 
         text = (
             "👨‍✈️ *Admin Command Center*\n\n"
-            "/view_daily - Today's operational stats\n"
-            "/view_weekly - Last 7 days summary\n"
-            "/view_fuel - Fleet fuel efficiency (KM/L)\n"
-            "/download_photos <YYYY-MM-DD> - Get ZIP of all photos for a date"
+            "/viewdaily - Today's operational stats\n"
+            "/viewweekly - Last 7 days summary\n"
+            "/viewfuel - Fleet fuel efficiency (KM/L)\n"
+            "/downloadphotos <YYYY-MM-DD> - Get ZIP of all photos for a date\n\n"
+            "💡 _If the bot is not responding, tap the Admin Panel button again to reset._"
         )
         await update.effective_message.reply_text(text, parse_mode="Markdown")
 
