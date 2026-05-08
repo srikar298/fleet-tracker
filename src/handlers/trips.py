@@ -5,7 +5,6 @@ from datetime import datetime
 from telegram import InlineKeyboardButton, InlineKeyboardMarkup, Update
 from telegram.ext import ContextTypes, ConversationHandler
 
-from core.gamification import GamificationEngine
 from core.states import (
     DAILY_TARGET_VALUE,
     END_TRIP_EXPENSE_PHOTO,
@@ -322,8 +321,10 @@ class TripHandler(BaseHandler):
         )
         context.user_data["fuel_image_url"] = url  # type: ignore
 
-        await update.message.reply_text("Enter Total Revenue for this trip (in ₹):")  # type: ignore
-        return END_TRIP_REVENUE
+        await update.message.reply_text(  # type: ignore
+            "Any other expenses? (Toll/Parking/Maintenance)\nEnter total amount (or 0):"
+        )
+        return END_TRIP_OTHER_EXP
 
     async def handle_end_revenue(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
         try:
@@ -377,32 +378,19 @@ class TripHandler(BaseHandler):
         revenue = context.user_data.get("revenue", 0)  # type: ignore
         fuel = float(context.user_data.get("fuel_cost", 0))  # type: ignore
         other = context.user_data.get("other_expenses", 0)  # type: ignore
-        net = revenue - fuel - other
+        total_expenses = fuel + other
 
         context.user_data["distance"] = distance  # type: ignore
-        context.user_data["net"] = net  # type: ignore
-
-        gamification_text = ""
-        target = self.attendance.get_daily_target(update.effective_user.id)  # type: ignore
-        if target and target["value"] > 0:
-            summary_stats = self.sheets.get_driver_today_summary(
-                update.effective_user.id  # type: ignore
-            )
-            current_trips = summary_stats["trips"] + 1
-            current_rev = summary_stats["revenue"] + revenue
-
-            current_val = current_trips if target["type"] == "Trips" else current_rev
-            gamification_text = GamificationEngine.generate_progress_bar(current_val, target["value"], target["type"])
+        context.user_data["total_expenses"] = total_expenses  # type: ignore
 
         summary = (
             f"📊 *Trip Summary*\n"
-            f"Distance: {distance} km\n"
-            f"Fuel: ₹{fuel}\n"
-            f"Other: ₹{other}\n"
-            f"Revenue: ₹{revenue}\n"
-            f"------------\n"
-            f"Net Profit: ₹{net}\n"
-            f"{gamification_text}"
+            f"━━━━━━━━━━━━━━━━━━━━\n"
+            f"🛣 Distance: `{distance} km`\n"
+            f"⛽ Fuel: `₹{fuel}`\n"
+            f"🛠 Other: `₹{other}`\n"
+            f"━━━━━━━━━━━━━━━━━━━━\n"
+            f"💰 *Total Spent*: `₹{total_expenses}`\n"
         )
 
         keyboard = [
