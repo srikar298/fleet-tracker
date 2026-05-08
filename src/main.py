@@ -3,7 +3,7 @@ import os
 
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
 from dotenv import load_dotenv
-from telegram import Update
+from telegram import BotCommand, Update
 from telegram.ext import (
     Application,
     CallbackQueryHandler,
@@ -83,9 +83,19 @@ class FleetBot:
         return user_id in self.admin_ids
 
     async def post_init(self, application: Application) -> None:
-        """Starts the scheduler after the event loop is running."""
+        """Starts the scheduler and registers bot commands."""
+        # 1. Start Background Scheduler
         self.scheduler.start()
         logger.info("Scheduler started successfully in post_init.")
+
+        # 2. Register Bot Commands for the Menu Button
+        commands = [
+            BotCommand("start", "🚀 Main Menu"),
+            BotCommand("admin", "👨‍✈️ Admin Command Center"),
+            BotCommand("cancel", "❌ Cancel Current Action"),
+        ]
+        await application.bot.set_my_commands(commands)
+        logger.info("Bot commands registered successfully.")
 
     async def start(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
         is_admin = self.is_admin(update.effective_user.id)
