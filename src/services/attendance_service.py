@@ -125,6 +125,38 @@ class AttendanceService:
                 self.update_monthly_payroll_live(driver_id, today[:7], earnings)
                 return
 
+        # --- AUTO-CREATE IF MISSING ---
+        driver_info = self.sheets.get_driver_by_id(driver_id)
+        base_salary = 27000.0
+        if driver_info and driver_info.get("Base_Salary"):
+            try:
+                base_salary = float(driver_info["Base_Salary"])
+            except (ValueError, TypeError):
+                pass
+        
+        daily_base = base_salary / 26.0
+        # Calculate earnings for the first trip
+        # amount is the trips just added (usually 1.0)
+        trips_done = amount
+        target = 5.0
+        earnings = (trips_done / target) * daily_base
+        
+        row_data = [
+            today,
+            driver_id,
+            "Auto", # ClientID
+            datetime.now().strftime("%H:%M:%S"), # Start
+            datetime.now().strftime("%H:%M:%S"), # End
+            "Present",
+            "Trips", # Target_Type
+            target,
+            trips_done,
+            "Yes" if trips_done >= target else "No",
+            round(earnings, 2)
+        ]
+        sheet.append_row(row_data)
+        self.update_monthly_payroll_live(driver_id, today[:7], earnings)
+
     def update_monthly_payroll_live(self, driver_id: str | int, month_str: str, daily_earnings: float) -> None:
         """Updates the Monthly_Payroll sheet in real-time"""
         payroll_ws = self.sheets.get_sheet("Monthly_Payroll")
@@ -137,7 +169,16 @@ class AttendanceService:
         present_days = 0
         total_extra_bonus = 0.0
         total_shortfall = 0.0
-        daily_base = 1038.5
+        
+        # Fetch dynamic base salary
+        driver_info = self.sheets.get_driver_by_id(driver_id)
+        base_salary = 27000.0
+        if driver_info and driver_info.get("Base_Salary"):
+            try:
+                base_salary = float(driver_info["Base_Salary"])
+            except (ValueError, TypeError):
+                pass
+        daily_base = base_salary / 26.0
         
         for r in records:
             if str(r.get("DriverID")) == str(driver_id) and str(r.get("Date")).startswith(month_str):
