@@ -1,3 +1,4 @@
+import logging
 import os
 from datetime import datetime
 from typing import Any, Dict, List, Optional
@@ -5,6 +6,8 @@ from typing import Any, Dict, List, Optional
 import gspread
 from dotenv import load_dotenv
 from google.oauth2.service_account import Credentials
+
+logger = logging.getLogger(__name__)
 
 load_dotenv()
 
@@ -19,19 +22,28 @@ class SheetsService:
         self.sheet_id = os.getenv("GOOGLE_SHEETS_ID")
 
         try:
+            if not self.sheet_id:
+                logger.error("❌ GOOGLE_SHEETS_ID is missing!")
+                self.spreadsheet = None
+                return
+
             # Try to load from environment variable first (standard for Cloud/Railway)
             json_content = os.getenv("GOOGLE_CREDENTIALS_JSON")
             if json_content:
                 import json
-
                 info = json.loads(json_content)
                 self.creds = Credentials.from_service_account_info(info, scopes=self.scope)
-            else:
+            elif os.path.exists(self.credentials_path):
                 self.creds = Credentials.from_service_account_file(self.credentials_path, scopes=self.scope)
+            else:
+                logger.error("❌ No credentials.json or GOOGLE_CREDENTIALS_JSON found!")
+                self.spreadsheet = None
+                return
+
             self.client = gspread.authorize(self.creds)
-            self.spreadsheet: gspread.Spreadsheet | None = self.client.open_by_key(str(self.sheet_id))
+            self.spreadsheet = self.client.open_by_key(str(self.sheet_id))
         except Exception as e:
-            print(f"Failed to initialize Sheets Service: {e}")
+            logger.error(f"❌ Failed to initialize Sheets Service: {e}")
             self.spreadsheet = None
 
     def get_sheet(self, name: str) -> gspread.Worksheet | None:

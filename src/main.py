@@ -161,14 +161,17 @@ class FleetBot:
 
 
     def run(self) -> None:
-        # Silence non-critical Telegram warnings
-        warnings.filterwarnings("ignore", category=PTBUserWarning)
+        """Entry point to start the bot."""
+        if not self.token:
+            logger.error("❌ TELEGRAM_BOT_TOKEN is missing! Deployment aborted.")
+            return
 
-        # Persistence for stateful conversations across restarts
-        persistence = PicklePersistence(filepath="bot_state.pkl")
-
-        application = Application.builder().token(self.token).persistence(persistence).post_init(self.post_init).build()
-
+        application = (
+            Application.builder()
+            .token(self.token)
+            .post_init(self.post_init)
+            .build()
+        )
         conv_handler = ConversationHandler(
             entry_points=[
                 CommandHandler("start", self.start),

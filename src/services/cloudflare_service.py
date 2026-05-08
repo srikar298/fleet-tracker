@@ -20,16 +20,25 @@ class CloudflareR2Service:
         self.public_url = str(os.getenv("CLOUDFLARE_R2_PUBLIC_URL", "")).rstrip("/")
 
         # R2 Endpoint URL
+        if not self.account_id:
+            logger.error("❌ CLOUDFLARE_R2_ACCOUNT_ID is missing!")
+            self.s3_client = None
+            return
+
         self.endpoint_url = f"https://{self.account_id}.r2.cloudflarestorage.com"
 
-        self.s3_client = boto3.client(
-            service_name="s3",
-            endpoint_url=self.endpoint_url,
-            aws_access_key_id=self.access_key,
-            aws_secret_access_key=self.secret_key,
-            region_name="auto",  # Cloudflare R2 requires "auto" region
-            config=Config(signature_version="s3v4"),
-        )
+        try:
+            self.s3_client = boto3.client(
+                service_name="s3",
+                endpoint_url=self.endpoint_url,
+                aws_access_key_id=self.access_key,
+                aws_secret_access_key=self.secret_key,
+                region_name="auto",
+                config=Config(signature_version="s3v4"),
+            )
+        except Exception as e:
+            logger.error(f"❌ Failed to initialize R2 client: {e}")
+            self.s3_client = None
 
     def _compress_image(self, file_content: bytes, max_size_kb: int = 500) -> bytes:
         """Resizes and compresses image to stay under target KB size."""
@@ -54,6 +63,8 @@ class CloudflareR2Service:
 
     def upload_file(self, file_content: bytes, driver_name: str, trip_id: str, image_type: str) -> str | None:
         """Uploads a file to Cloudflare R2 bucket."""
+        if not self.s3_client:
+            return None
         try:
             # Compress before upload
             compressed_content = self._compress_image(file_content)
@@ -81,6 +92,8 @@ class CloudflareR2Service:
             return None
 
     def save_kyc_document(self, file_content: bytes, driver_name: str) -> str | None:
+        if not self.s3_client:
+            return None
         try:
             # Compress before upload
             compressed_content = self._compress_image(file_content)
@@ -100,6 +113,8 @@ class CloudflareR2Service:
     def save_fuel_receipt(
         self, file_content: bytes, driver_name: str, trip_id: str, vehicle_id: str, cost: str | float
     ) -> str | None:
+        if not self.s3_client:
+            return None
         try:
             # Compress before upload
             compressed_content = self._compress_image(file_content)
@@ -122,6 +137,8 @@ class CloudflareR2Service:
     def save_expense_receipt(
         self, file_content: bytes, driver_name: str, vehicle_id: str, expense_amount: str | float
     ) -> str | None:
+        if not self.s3_client:
+            return None
         try:
             # Compress before upload
             compressed_content = self._compress_image(file_content)
@@ -140,6 +157,8 @@ class CloudflareR2Service:
             return None
 
     def save_incident_report(self, file_content: bytes, driver_name: str, vehicle_id: str) -> str | None:
+        if not self.s3_client:
+            return None
         try:
             # Compress before upload
             compressed_content = self._compress_image(file_content)
@@ -158,6 +177,8 @@ class CloudflareR2Service:
 
     def generate_period_zip(self, prefix: str) -> io.BytesIO | None:
         """Fetches all files under a prefix and returns a ZIP file in memory."""
+        if not self.s3_client:
+            return None
         try:
             logger.info(f"🔍 Searching R2 for: {prefix}")
             response = self.s3_client.list_objects_v2(Bucket=self.bucket_name, Prefix=prefix)
@@ -182,6 +203,8 @@ class CloudflareR2Service:
 
     def flag_trip_images(self, date_str: str, driver_name: str, trip_id: str) -> bool:
         """Flags trip images for audit by logging them."""
+        if not self.s3_client:
+            return False
         # In R2 we just log the flagging event as we don't have 'starring'
         prefix = f"trips/{date_str}/{driver_name}/{trip_id}"
         logger.warning(f"🚩 Trip Flagged for Audit: {prefix}")
@@ -190,6 +213,8 @@ class CloudflareR2Service:
 
     def generate_range_zip(self, start_date: str, end_date: str) -> io.BytesIO | None:
         """Fetches all files between two dates and returns a ZIP."""
+        if not self.s3_client:
+            return None
         try:
             logger.info(f"🔍 Generating ZIP from {start_date} to {end_date}")
 
