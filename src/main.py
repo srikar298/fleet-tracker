@@ -250,6 +250,13 @@ class FleetBot:
                     )
                 ],
                 FUEL_IMAGE: [MessageHandler(filters.PHOTO, self.trip_handler.handle_fuel_image)],
+                END_TRIP_OTHER_EXP: [
+                    MessageHandler(
+                        filters.TEXT & ~filters.COMMAND,
+                        self.trip_handler.handle_end_other_exp,
+                    )
+                ],
+                END_TRIP_EXPENSE_PHOTO: [MessageHandler(filters.PHOTO, self.trip_handler.handle_end_expense_photo)],
                 END_TRIP_SUMMARY: [CallbackQueryHandler(self.trip_handler.handle_end_summary)],
                 # Admin Download Range
                 ADMIN_DL_FROM: [MessageHandler(filters.TEXT & ~filters.COMMAND, self.admin_handler.handle_from_date)],

@@ -144,7 +144,7 @@ class SheetsService:
         records = ws.get_all_records()
         for i, r in enumerate(records, 2):
             if str(r.get("VendorID")) == str(v_id):
-                ws.update(f"A{i}:E{i}", [[v_id, v_id, client, billed, payout]])
+                ws.update(values=[[v_id, v_id, client, billed, payout]], range_name=f"A{i}:E{i}")
                 return True
         
         # Otherwise append

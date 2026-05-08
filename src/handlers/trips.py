@@ -326,7 +326,8 @@ class TripHandler(BaseHandler):
         else:
             context.user_data["fuel_liters"] = "0"
             context.user_data["fuel_cost"] = "0"
-            return await self.show_end_summary(update, context)
+            await query.edit_message_text("Any other expenses? (Toll/Parking/Maintenance)\nEnter total amount (or 0):")
+            return END_TRIP_OTHER_EXP
 
     async def handle_fuel_data(self, update: Update, context: ContextTypes.DEFAULT_TYPE) -> Any:
         if not update.message or not update.message.text or context.user_data is None:
@@ -371,6 +372,40 @@ class TripHandler(BaseHandler):
             context.user_data.get("fuel_cost", 0),
         )
         context.user_data["fuel_image_url"] = url
+
+        await update.message.reply_text("Any other expenses? (Toll/Parking/Maintenance)\nEnter total amount (or 0):")
+        return END_TRIP_OTHER_EXP
+
+    async def handle_end_other_exp(self, update: Update, context: ContextTypes.DEFAULT_TYPE) -> Any:
+        if not update.message or not update.message.text or context.user_data is None:
+            return None
+        try:
+            other = float(update.message.text)
+            context.user_data["other_expenses"] = other
+            if other > 0:
+                await update.message.reply_text(
+                    "Please upload a photo of the receipt for this expense (Toll/Maintenance):"
+                )
+                return END_TRIP_EXPENSE_PHOTO
+            else:
+                return await self.show_end_summary(update, context)
+        except ValueError:
+            await update.message.reply_text("Invalid number. Try again:")
+            return END_TRIP_OTHER_EXP
+
+    async def handle_end_expense_photo(self, update: Update, context: ContextTypes.DEFAULT_TYPE) -> Any:
+        if not update.message or not update.message.photo or not update.effective_user or context.user_data is None:
+            return None
+        photo_file = await update.message.photo[-1].get_file()
+        photo_bytes = await photo_file.download_as_bytearray()
+
+        driver_name = str(update.effective_user.first_name)
+        v_id = str(context.user_data.get("vehicle_id", "Unknown"))
+        cost = context.user_data.get("other_expenses", 0)
+        trip_id = str(context.user_data.get("trip_id", "Unknown"))
+
+        url = self.drive.save_expense_receipt(photo_bytes, driver_name, v_id, cost)
+        context.user_data["expense_image_url"] = url
 
         return await self.show_end_summary(update, context)
 
@@ -486,7 +521,7 @@ class TripHandler(BaseHandler):
                 "other_expenses": context.user_data.get("other_expenses", 0),
                 "client_billed": rates["client_billed"],
                 "driver_payout": rates["driver_payout"],
-                "net_profit": "=R{row}-S{row}", # Gross Margin = Billed - Payout
+                "net_profit": "=R{row}-S{row}-P{row}-Q{row}", # Gross Margin = Billed - Payout - Fuel - Other
                 "driver_score": score,
                 "start_image": context.user_data.get("start_image_url"),
                 "end_image": context.user_data.get("end_image_url"),
