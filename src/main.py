@@ -11,6 +11,7 @@ from telegram.ext import (
     ContextTypes,
     ConversationHandler,
     MessageHandler,
+    PicklePersistence,
     filters,
 )
 
@@ -119,7 +120,10 @@ class FleetBot:
         return ConversationHandler.END
 
     def run(self):
-        application = Application.builder().token(self.token).post_init(self.post_init).build()
+        # Persistence for stateful conversations across restarts
+        persistence = PicklePersistence(filepath="bot_state.pkl")
+
+        application = Application.builder().token(self.token).persistence(persistence).post_init(self.post_init).build()
 
         conv_handler = ConversationHandler(
             entry_points=[

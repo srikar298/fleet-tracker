@@ -19,6 +19,7 @@ trip_images/
 04_Incident_Reports/
 05_Archived_Data/
 bot.log
+bot_state.pkl
 
 # IDEs
 .vscode/
