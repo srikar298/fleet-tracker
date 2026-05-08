@@ -24,7 +24,7 @@ We have successfully transitioned the Fleet Tracker from a basic prototype to a 
 *   **Language**: Python 3.10+
 *   **Interface**: Telegram Bot API (`python-telegram-bot`)
 *   **Database**: Google Sheets (via `gspread` and `google-api-python-client`)
-*   **Storage**: Google Drive (for KYC and Odometer images)
+*   **Storage**: Cloudflare R2 (S3-compatible Object Storage for images)
 *   **Analytics**: Automated formula-based dashboards.
 
 ## Recent Prompts & Workflow Evolution

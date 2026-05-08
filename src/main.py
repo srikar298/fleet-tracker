@@ -1,6 +1,7 @@
 import logging
 import os
 
+from apscheduler.schedulers.asyncio import AsyncIOScheduler
 from dotenv import load_dotenv
 from telegram import Update
 from telegram.ext import (
@@ -34,24 +35,23 @@ from core.states import (
     REPORT_DESC,
     REPORT_PHOTO,
     REPORT_VEHICLE,
-    START_TRIP_DEST,
     START_TRIP_IMAGE,
     START_TRIP_LOC,
     START_TRIP_ODO,
     START_TRIP_VEHICLE,
 )
+from handlers.admin import AdminHandler
 from handlers.incidents import IncidentHandler
 from handlers.registration import RegistrationHandler
 from handlers.trips import TripHandler
 from services.attendance_service import AttendanceService
-from services.drive_service import DriveService
+from services.backup_service import BackupService
+from services.cloudflare_service import CloudflareR2Service
 from services.sheets_service import SheetsService
 from utils.ui import get_main_menu
 
 # Enable logging
-logging.basicConfig(
-    format="%(asctime)s - %(name)s - %(levelname)s - %(message)s", level=logging.INFO
-)
+logging.basicConfig(format="%(asctime)s - %(name)s - %(levelname)s - %(message)s", level=logging.INFO)
 logger = logging.getLogger(__name__)
 
 load_dotenv()
@@ -63,13 +63,19 @@ class FleetBot:
 
         # Initialize Core Services (Dependency Injection)
         self.sheets = SheetsService()
-        self.drive = DriveService()
+        self.drive = CloudflareR2Service()
         self.attendance = AttendanceService(self.sheets)
 
         # Initialize Domain Handlers
         self.reg_handler = RegistrationHandler(self.sheets, self.drive, self.attendance)
         self.inc_handler = IncidentHandler(self.sheets, self.drive, self.attendance)
         self.trip_handler = TripHandler(self.sheets, self.drive, self.attendance)
+        self.admin_handler = AdminHandler(self.sheets, self.drive, self.attendance)
+        self.backup = BackupService(self.sheets, self.drive)
+
+        # Initialize Scheduler for Backups
+        self.scheduler = AsyncIOScheduler()
+        self.scheduler.add_job(self.backup.run_daily_backup, "cron", hour=0, minute=0)
 
     async def start(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
         await update.message.reply_text(  # type: ignore
@@ -83,9 +89,7 @@ class FleetBot:
         )
         return ConversationHandler.END
 
-    async def today_summary_cmd(
-        self, update: Update, context: ContextTypes.DEFAULT_TYPE
-    ):
+    async def today_summary_cmd(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
         summary = self.sheets.get_driver_today_summary(update.effective_user.id)  # type: ignore
         text = (
             f"📊 *Today's Summary*\n"
@@ -115,18 +119,10 @@ class FleetBot:
         conv_handler = ConversationHandler(
             entry_points=[
                 CommandHandler("start", self.start),
-                MessageHandler(
-                    filters.Regex("^👤 Profile$"), self.reg_handler.register_cmd
-                ),
-                MessageHandler(
-                    filters.Regex("^🚗 Start Trip$"), self.trip_handler.start_trip_cmd
-                ),
-                MessageHandler(
-                    filters.Regex("^🛑 End Trip$"), self.trip_handler.end_trip_cmd
-                ),
-                MessageHandler(
-                    filters.Regex("^📊 Today Summary$"), self.today_summary_cmd
-                ),
+                MessageHandler(filters.Regex("^👤 Profile$"), self.reg_handler.register_cmd),
+                MessageHandler(filters.Regex("^🚗 Start Trip$"), self.trip_handler.start_trip_cmd),
+                MessageHandler(filters.Regex("^🛑 End Trip$"), self.trip_handler.end_trip_cmd),
+                MessageHandler(filters.Regex("^📊 Today Summary$"), self.today_summary_cmd),
                 MessageHandler(filters.Regex("^🏆 Leaderboard$"), self.leaderboard_cmd),
                 MessageHandler(
                     filters.Regex("^⚠️ Report Damage$"),
@@ -154,28 +150,18 @@ class FleetBot:
                         self.reg_handler.handle_register_license,
                     )
                 ],
-                REGISTER_LICENSE_PHOTO: [
-                    MessageHandler(
-                        filters.PHOTO, self.reg_handler.handle_register_license_photo
-                    )
-                ],
+                REGISTER_LICENSE_PHOTO: [MessageHandler(filters.PHOTO, self.reg_handler.handle_register_license_photo)],
                 # Incident Routing
-                REPORT_VEHICLE: [
-                    CallbackQueryHandler(self.inc_handler.handle_report_vehicle)
-                ],
+                REPORT_VEHICLE: [CallbackQueryHandler(self.inc_handler.handle_report_vehicle)],
                 REPORT_DESC: [
                     MessageHandler(
                         filters.TEXT & ~filters.COMMAND,
                         self.inc_handler.handle_report_desc,
                     )
                 ],
-                REPORT_PHOTO: [
-                    MessageHandler(filters.PHOTO, self.inc_handler.handle_report_photo)
-                ],
+                REPORT_PHOTO: [MessageHandler(filters.PHOTO, self.inc_handler.handle_report_photo)],
                 # Gamification Routing (handled by trips)
-                DAILY_TARGET_TYPE: [
-                    CallbackQueryHandler(self.trip_handler.handle_target_type)
-                ],
+                DAILY_TARGET_TYPE: [CallbackQueryHandler(self.trip_handler.handle_target_type)],
                 DAILY_TARGET_VALUE: [
                     MessageHandler(
                         filters.TEXT & ~filters.COMMAND,
@@ -183,24 +169,14 @@ class FleetBot:
                     )
                 ],
                 # Start Trip Routing
-                START_TRIP_VEHICLE: [
-                    CallbackQueryHandler(self.trip_handler.handle_start_vehicle)
-                ],
-                START_TRIP_DEST: [
-                    MessageHandler(
-                        filters.TEXT & ~filters.COMMAND,
-                        self.trip_handler.handle_start_dest,
-                    )
-                ],
+                START_TRIP_VEHICLE: [CallbackQueryHandler(self.trip_handler.handle_start_vehicle)],
                 START_TRIP_ODO: [
                     MessageHandler(
                         filters.TEXT & ~filters.COMMAND,
                         self.trip_handler.handle_start_odo,
                     )
                 ],
-                START_TRIP_IMAGE: [
-                    MessageHandler(filters.PHOTO, self.trip_handler.handle_start_image)
-                ],
+                START_TRIP_IMAGE: [MessageHandler(filters.PHOTO, self.trip_handler.handle_start_image)],
                 START_TRIP_LOC: [
                     MessageHandler(
                         filters.LOCATION | filters.TEXT & ~filters.COMMAND,
@@ -208,36 +184,28 @@ class FleetBot:
                     )
                 ],
                 # End Trip Routing
-                END_TRIP_VEHICLE: [
-                    CallbackQueryHandler(self.trip_handler.handle_end_vehicle)
-                ],
+                END_TRIP_VEHICLE: [CallbackQueryHandler(self.trip_handler.handle_end_vehicle)],
                 END_TRIP_ODO: [
                     MessageHandler(
                         filters.TEXT & ~filters.COMMAND,
                         self.trip_handler.handle_end_odo,
                     )
                 ],
-                END_TRIP_IMAGE: [
-                    MessageHandler(filters.PHOTO, self.trip_handler.handle_end_image)
-                ],
+                END_TRIP_IMAGE: [MessageHandler(filters.PHOTO, self.trip_handler.handle_end_image)],
                 END_TRIP_LOC: [
                     MessageHandler(
                         filters.LOCATION | filters.TEXT & ~filters.COMMAND,
                         self.trip_handler.handle_end_loc,
                     )
                 ],
-                FUEL_PROMPT: [
-                    CallbackQueryHandler(self.trip_handler.handle_fuel_prompt)
-                ],
+                FUEL_PROMPT: [CallbackQueryHandler(self.trip_handler.handle_fuel_prompt)],
                 FUEL_DATA: [
                     MessageHandler(
                         filters.TEXT & ~filters.COMMAND,
                         self.trip_handler.handle_fuel_data,
                     )
                 ],
-                FUEL_IMAGE: [
-                    MessageHandler(filters.PHOTO, self.trip_handler.handle_fuel_image)
-                ],
+                FUEL_IMAGE: [MessageHandler(filters.PHOTO, self.trip_handler.handle_fuel_image)],
                 END_TRIP_REVENUE: [
                     MessageHandler(
                         filters.TEXT & ~filters.COMMAND,
@@ -250,14 +218,8 @@ class FleetBot:
                         self.trip_handler.handle_end_other_exp,
                     )
                 ],
-                END_TRIP_EXPENSE_PHOTO: [
-                    MessageHandler(
-                        filters.PHOTO, self.trip_handler.handle_end_expense_photo
-                    )
-                ],
-                END_TRIP_SUMMARY: [
-                    CallbackQueryHandler(self.trip_handler.handle_end_summary)
-                ],
+                END_TRIP_EXPENSE_PHOTO: [MessageHandler(filters.PHOTO, self.trip_handler.handle_end_expense_photo)],
+                END_TRIP_SUMMARY: [CallbackQueryHandler(self.trip_handler.handle_end_summary)],
             },
             fallbacks=[
                 CommandHandler("start", self.start),
@@ -266,6 +228,14 @@ class FleetBot:
         )
 
         application.add_handler(conv_handler)
+
+        # Admin Commands
+        application.add_handler(CommandHandler("admin", self.admin_handler.admin_menu))
+        application.add_handler(CommandHandler("view_daily", self.admin_handler.view_daily_stats))
+        application.add_handler(CommandHandler("view_fuel", self.admin_handler.view_fuel_stats))
+        application.add_handler(CommandHandler("download_photos", self.admin_handler.download_photos))
+
+        self.scheduler.start()
         application.run_polling()
 
 

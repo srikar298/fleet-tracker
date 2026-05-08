@@ -35,6 +35,6 @@ graph TD
 *   **Dashboard**: High-level KPI view using `COUNTIFS` and `SUMIFS` formulas.
 
 ### Security & Compliance
-*   **KYC Storage**: All license photos are stored in a private Google Drive folder indexed by driver name.
+*   **KYC Storage**: All license photos are stored in a private Cloudflare R2 bucket, organized by driver name.
 *   **Fraud Detection**: The system flags trips where Odometer jumps are >300km or when start/end locations don't match the reported distance.
 *   **Role-Based Access**: Drivers interact only via Telegram; managers have edit access to the Sheets backend.
