@@ -39,7 +39,8 @@ class AdminHandler(BaseHandler):
             "📸 *Media Center*\n"
             "• /gallery - Recent trip photos 🖼️\n"
             "• /downloadtoday - ZIP of today's photos\n"
-            "• /downloadrange - Custom date ZIP\n\n"
+            "• /downloadrange - Custom date ZIP\n"
+            "• /downloadphotos <YYYY-MM-DD>\n\n"
             "💡 _Tip: Tapping the Admin button resets stuck states._"
         )
         await update.effective_message.reply_text(text, parse_mode="Markdown")
@@ -56,7 +57,7 @@ class AdminHandler(BaseHandler):
         r2_ok = "🟢 OK"
         try:
             self.drive.s3_client.list_buckets()
-        except:
+        except Exception:
             r2_ok = "🔴 Error"
 
         text = (

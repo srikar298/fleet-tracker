@@ -37,6 +37,8 @@ from core.states import (
     REPORT_DESC,
     REPORT_PHOTO,
     REPORT_VEHICLE,
+    START_TRIP_IMAGE,
+    START_TRIP_LOC,
     START_TRIP_ODO,
     START_TRIP_VEHICLE,
 )
