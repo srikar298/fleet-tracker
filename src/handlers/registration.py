@@ -19,8 +19,8 @@ class RegistrationHandler(BaseHandler):
             text = (
                 f"👤 *Your Profile*\n\n"
                 f"*Name*: {driver.get('Name')}\n"
-                f"*Phone*: {driver.get('PhoneNumber')}\n"
-                f"*License*: {driver.get('LicenseNumber')}\n"
+                f"*Phone*: {driver.get('Phone')}\n"
+                f"*License*: {driver.get('License')}\n"
                 f"*Vendor*: {driver.get('VendorID')}\n"
                 f"*Status*: {driver.get('Status')}\n\n"
                 f"Your details are already registered!"

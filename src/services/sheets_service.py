@@ -108,7 +108,7 @@ class SheetsService:
         """Fetches driver details by Telegram ID."""
         records = self.get_records_safe("Master_Drivers")
         for r in records:
-            if str(r.get("TelegramID")) == str(telegram_id):
+            if str(r.get("DriverID")) == str(telegram_id):
                 return r
         return None
 
