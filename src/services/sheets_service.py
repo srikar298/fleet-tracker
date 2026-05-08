@@ -123,34 +123,36 @@ class SheetsService:
         return self.append_row("Master_Drivers", [driver_id, name, license, vendor_id, phone, "Active"])
 
     def record_trip(self, trip_data: dict[str, Any]) -> bool:
-        """Appends a final trip record to the Trips sheet"""
+        """Appends a final trip record to the Trips sheet matching B2B headers exactly"""
         return self.append_row(
             "Trips",
             [
-                trip_data.get("trip_id"),
-                trip_data.get("date"),
-                trip_data.get("vendor_id"),
-                trip_data.get("driver_id"),
-                trip_data.get("vehicle_id"),
-                trip_data.get("start_time"),
-                trip_data.get("end_time"),
-                trip_data.get("duration"),
-                trip_data.get("start_location"),
-                trip_data.get("end_location"),
-                trip_data.get("start_odo"),
-                trip_data.get("end_odo"),
-                trip_data.get("distance"),
-                trip_data.get("fuel_liters"),
-                trip_data.get("fuel_cost"),
-                trip_data.get("other_expenses"),
-                trip_data.get("revenue"),
-                trip_data.get("net_profit"),
-                trip_data.get("driver_score"),
-                trip_data.get("start_image"),
-                trip_data.get("end_image"),
-                trip_data.get("fuel_image"),
-                trip_data.get("flag"),
-                trip_data.get("remarks"),
+                trip_data.get("trip_id"),           # TripID
+                trip_data.get("date"),              # Date
+                trip_data.get("client_name", "N/A"),# Client_Name
+                trip_data.get("vendor_id"),         # VendorID
+                trip_data.get("driver_id"),         # DriverID
+                trip_data.get("vehicle_id"),        # VehicleID
+                trip_data.get("start_time"),        # Start_Time
+                trip_data.get("end_time"),          # End_Time
+                trip_data.get("duration"),          # Duration_Mins
+                trip_data.get("start_location"),    # Start_Location
+                trip_data.get("end_location"),      # End_Location
+                trip_data.get("start_odo"),         # Start_Odometer
+                trip_data.get("end_odo"),           # End_Odometer
+                trip_data.get("distance"),          # Distance
+                trip_data.get("fuel_liters"),       # Fuel_Liters
+                trip_data.get("fuel_cost"),         # Fuel_Cost
+                trip_data.get("other_expenses"),    # Other_Expenses
+                trip_data.get("client_billed", 0),  # Client_Billed_Amount
+                trip_data.get("driver_payout", 0),  # Driver_Payout_Amount
+                trip_data.get("net_profit"),        # Gross_Margin
+                trip_data.get("driver_score"),      # Driver_Score
+                trip_data.get("start_image"),       # Start_Image
+                trip_data.get("end_image"),         # End_Image
+                trip_data.get("fuel_image"),        # Receipt_Image
+                trip_data.get("flag"),              # Flag
+                trip_data.get("remarks"),           # Remarks
             ],
         )
 
