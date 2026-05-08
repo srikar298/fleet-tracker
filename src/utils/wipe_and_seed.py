@@ -41,10 +41,10 @@ def wipe_and_seed() -> None:
 
     # 3. Seed Master_Drivers & Vehicles (The Foundations)
     try:
-        # DriverID, Name, License, ClientID, Phone, Base_Salary, Status
+        # DriverID, Name, License, License_Photo, ClientID, Phone, Base_Salary, Status
         driver_id = 12345678 # Test ID
         ws_drivers = service.get_sheet("Master_Drivers")
-        ws_drivers.append_row([driver_id, "Srikar", "TS-09-2026", "C-XGAT", "9988776655", 27000, "Active"])
+        ws_drivers.append_row([driver_id, "Srikar", "TS-09-2026", "https://example.com/license.jpg", "C-XGAT", "9988776655", 27000, "Active"])
         
         # VehicleID, LicensePlate, ClientID, Last_Odometer, Status
         ws_vech = service.get_sheet("Master_Vehicles")

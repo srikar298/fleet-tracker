@@ -64,11 +64,11 @@ class RegistrationHandler(BaseHandler):
         photo_bytes = await photo_file.download_as_bytearray()
 
         name = str(context.user_data.get("driver_name", "Unknown"))
-        self.drive.save_kyc_document(photo_bytes, name)
+        photo_url = self.drive.save_kyc_document(photo_bytes, name) or "N/A"
 
         license_num = str(context.user_data.get("license_num", "Unknown"))
         phone = str(context.user_data.get("driver_phone", "Unknown"))
-        self.sheets.register_driver(update.effective_user.id, name, license_num, phone)
+        self.sheets.register_driver(update.effective_user.id, name, license_num, photo_url, phone)
 
         is_admin = self.is_admin(update.effective_user.id)
         await update.message.reply_text(

@@ -151,9 +151,10 @@ class SheetsService:
         # Otherwise append
         return self.append_row("Master_Clients", [c_id, client_name, "B2B", billed, payout])
 
-    def register_driver(self, driver_id: int, name: str, license: str, phone: str, client_id: str = "C-MASTER") -> bool:
+    def register_driver(self, driver_id: int, name: str, license: str, photo_url: str, phone: str, client_id: str = "C-MASTER") -> bool:
         """Registers a new driver in Master_Drivers"""
-        return self.append_row("Master_Drivers", [driver_id, name, license, client_id, phone, "Active"])
+        # Order: DriverID, Name, License, License_Photo, ClientID, Phone, Base_Salary, Status
+        return self.append_row("Master_Drivers", [driver_id, name, license, photo_url, client_id, phone, 27000, "Active"])
 
     def record_trip(self, trip_data: dict[str, Any]) -> bool:
         """Appends a final trip record to the Trips sheet matching Business First order"""
