@@ -1,4 +1,5 @@
 import io
+import logging
 import os
 import zipfile
 from datetime import datetime
@@ -6,6 +7,8 @@ from datetime import datetime
 import boto3
 from botocore.config import Config
 from PIL import Image
+
+logger = logging.getLogger(__name__)
 
 
 class CloudflareR2Service:
@@ -67,11 +70,13 @@ class CloudflareR2Service:
                 ContentType="image/jpeg",
             )
 
+            logger.info(f"✅ Successfully uploaded image to R2: {key}")
+
             if self.public_url:
                 return f"{self.public_url}/{key}"
             return key  # Fallback to key if no public URL configured
         except Exception as e:
-            print(f"Error uploading to R2: {e}")
+            logger.error(f"❌ Error uploading to R2: {e}")
             return None
 
     def save_kyc_document(self, file_content, driver_name):
