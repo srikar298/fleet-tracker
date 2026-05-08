@@ -24,7 +24,7 @@ def init() -> None:
             "Start_Time", "End_Time", "Duration_Mins", "Start_Location", "End_Location", 
             "Start_Odometer", "End_Odometer", "Distance", "Fuel_Liters", "Fuel_Cost", 
             "Other_Expenses", "Client_Billed_Amount", "Driver_Payout_Amount", "Gross_Margin", 
-            "Driver_Score", "Start_Image", "End_Image", "Receipt_Image", "Flag", "Remarks"
+            "Net_Margin_Percentage", "Driver_Score", "Start_Image", "End_Image", "Receipt_Image", "Flag", "Remarks"
         ],
         "Attendance": ["Date", "DriverID", "VendorID", "First_CheckIn", "Last_Activity", "Status", "Target_Type", "Target_Value"],
         "Daily_Summary": ["Date", "VehicleID", "DriverID", "TripsCount", "TotalKM", "TotalFuelCost", "TotalOtherExpenses", "TotalBilled", "TotalPayout", "NetMargin", "FlagsCount", "DriverScoreAvg", "Status"],

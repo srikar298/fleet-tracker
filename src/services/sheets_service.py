@@ -179,6 +179,7 @@ class SheetsService:
                 trip_data.get("client_billed", 0),  # Client_Billed_Amount
                 trip_data.get("driver_payout", 0),  # Driver_Payout_Amount
                 trip_data.get("net_profit"),        # Gross_Margin
+                "=IF(R{row}>0, T{row}/R{row}, 0)",  # Net_Margin_Percentage
                 trip_data.get("driver_score"),      # Driver_Score
                 trip_data.get("start_image"),       # Start_Image
                 trip_data.get("end_image"),         # End_Image
