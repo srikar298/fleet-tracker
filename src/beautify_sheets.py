@@ -11,15 +11,15 @@ from services.sheets_service import SheetsService
 load_dotenv()
 
 
-def beautify():
+def beautify() -> None:
     service = SheetsService()
     if not service.spreadsheet:
         print("Could not connect to Spreadsheet.")
         return
 
     # Professional Color Palette (Normalized RGB 0-1)
-    COLOR_HEADER_BG = {"red": 0.07, "green": 0.18, "blue": 0.29}  # Deep Navy
-    COLOR_HEADER_TEXT = {"red": 1.0, "green": 1.0, "blue": 1.0}  # White
+    color_header_bg = {"red": 0.07, "green": 0.18, "blue": 0.29}  # Deep Navy
+    color_header_text = {"red": 1.0, "green": 1.0, "blue": 1.0}  # White
 
     sheets = service.spreadsheet.worksheets()
     requests = []
@@ -34,18 +34,18 @@ def beautify():
                     "range": {"sheetId": s_id, "startRowIndex": 0, "endRowIndex": 1},
                     "cell": {
                         "userEnteredFormat": {
-                            "backgroundColor": COLOR_HEADER_BG,
+                            "backgroundColor": color_header_bg,
                             "horizontalAlignment": "CENTER",
                             "verticalAlignment": "MIDDLE",
                             "textFormat": {
-                                "foregroundColor": COLOR_HEADER_TEXT,
+                                "foregroundColor": color_header_text,
                                 "bold": True,
                                 "fontSize": 10,
                             },
                             "borders": {
                                 "bottom": {
                                     "style": "SOLID_MEDIUM",
-                                    "color": COLOR_HEADER_TEXT,
+                                    "color": color_header_text,
                                 }
                             },
                         }

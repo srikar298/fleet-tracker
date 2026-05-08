@@ -1,5 +1,5 @@
 import os
-from typing import Any
+from typing import Any, Dict, List, Optional
 
 import gspread
 from dotenv import load_dotenv
@@ -28,7 +28,7 @@ class SheetsService:
             else:
                 self.creds = Credentials.from_service_account_file(self.credentials_path, scopes=self.scope)
             self.client = gspread.authorize(self.creds)
-            self.spreadsheet = self.client.open_by_key(self.sheet_id)
+            self.spreadsheet: gspread.Spreadsheet | None = self.client.open_by_key(str(self.sheet_id))
         except Exception as e:
             print(f"Failed to initialize Sheets Service: {e}")
             self.spreadsheet = None
@@ -62,7 +62,7 @@ class SheetsService:
                         data[i] = data[i].format(row=next_row)
 
                 # Update the row directly instead of using append_row to support formulas  # noqa: E501
-                sheet.update(f"A{next_row}", [data], value_input_option="USER_ENTERED")
+                sheet.update(f"A{next_row}", [data], value_input_option="USER_ENTERED")  # type: ignore
                 return True
             except Exception as e:
                 print(f"Error writing to sheet {sheet_name}: {e}")
@@ -92,6 +92,11 @@ class SheetsService:
             {"id": str(v.get("VehicleID")), "plate": str(v.get("LicensePlate"))} for v in records if v.get("VehicleID")
         ]
 
+    def get_vehicle_map(self) -> dict[str, str]:
+        """Returns a dict mapping VehicleID to LicensePlate"""
+        vehicles = self.get_all_vehicles()
+        return {str(v["id"]): str(v["plate"]) for v in vehicles}
+
     def update_vehicle_status(self, vehicle_id: str, odo: Any, status: str = "Idle") -> None:
         """Updates the status and odo of a vehicle in Master_Vehicles"""
         sheet = self.get_sheet("Master_Vehicles")
@@ -105,7 +110,7 @@ class SheetsService:
                 sheet.update_cell(i, 5, status)  # Status
                 return
 
-    def get_driver_by_id(self, telegram_id):
+    def get_driver_by_id(self, telegram_id: int) -> dict[str, Any] | None:
         """Fetches driver details by Telegram ID."""
         records = self.get_records_safe("Master_Drivers")
         for r in records:
@@ -113,11 +118,11 @@ class SheetsService:
                 return r
         return None
 
-    def register_driver(self, driver_id, name, license, phone, vendor_id="V-MASTER"):
+    def register_driver(self, driver_id: int, name: str, license: str, phone: str, vendor_id: str = "V-MASTER") -> bool:
         """Registers a new driver in Master_Drivers"""
         return self.append_row("Master_Drivers", [driver_id, name, license, vendor_id, phone, "Active"])
 
-    def record_trip(self, trip_data):
+    def record_trip(self, trip_data: dict[str, Any]) -> bool:
         """Appends a final trip record to the Trips sheet"""
         return self.append_row(
             "Trips",
@@ -149,14 +154,14 @@ class SheetsService:
             ],
         )
 
-    def get_driver_today_summary(self, driver_id):
+    def get_driver_today_summary(self, driver_id: int) -> dict[str, Any]:
         """Calculates today's summary for a specific driver from Trips sheet"""
         from datetime import datetime
 
         today = datetime.now().strftime("%Y-%m-%d")
         sheet = self.get_sheet("Trips")
         if not sheet:
-            return {"trips": 0, "km": 0, "fuel": 0, "revenue": 0, "net": 0}
+            return {"trips": 0, "km": 0, "fuel": 0, "revenue": 0, "net": 0, "trip_list": []}
 
         records = sheet.get_all_records()
         trips = 0
@@ -189,101 +194,109 @@ class SheetsService:
                 except (ValueError, TypeError):
                     pass
                 try:
-                    revenue += float(r.get("Revenue") or r.get("revenue") or 0)
+                    rev_val = r.get("Driver_Payout_Amount") or r.get("Revenue") or r.get("revenue") or 0
+                    revenue += float(rev_val)
                 except (ValueError, TypeError):
                     pass
 
         return {
             "trips": trips,
             "km": km,
-            "fuel": fuel,
-            "revenue": revenue,
-            "net": revenue - fuel,
             "trip_list": trip_list,
         }
 
-    def get_live_leaderboard(self):
+    def get_live_leaderboard(self, viewer_id: Optional[int] = None) -> str:
         from datetime import datetime
 
         today = datetime.now().strftime("%Y-%m-%d")
-
-        att_sheet = self.get_sheet("Attendance")
         trips_sheet = self.get_sheet("Trips")
-        master_drivers = self.get_sheet("Master_Drivers")
+        master_drivers_sheet = self.get_sheet("Master_Drivers")
 
-        if not att_sheet or not trips_sheet or not master_drivers:
+        if not trips_sheet or not master_drivers_sheet:
             return "Unable to fetch leaderboard."
 
-        driver_names = {str(d.get("DriverID")): d.get("Name", "Unknown") for d in master_drivers.get_all_records()}
+        # Map IDs to Names
+        driver_names = {
+            str(d.get("DriverID")): str(d.get("Name", "Unknown")) for d in master_drivers_sheet.get_all_records()
+        }
 
-        targets = {}
-        for r in att_sheet.get_all_records():
-            if r.get("Date") == today and r.get("Target_Type"):
-                targets[str(r.get("DriverID"))] = {
-                    "type": r.get("Target_Type"),
-                    "value": float(r.get("Target_Value", 0)),
-                }
-
-        progress = {did: {"trips": 0, "revenue": 0.0} for did in targets}
+        # Aggregate trips for today
+        trip_counts: dict[str, int] = {str(did): 0 for did in driver_names}
         for r in trips_sheet.get_all_records():
-            if r.get("Date") == today or r.get("date") == today:
+            r_date = r.get("Date") or r.get("date")
+            if str(r_date) == today:
                 did = str(r.get("DriverID"))
-                if did in progress:
-                    progress[did]["trips"] += 1
-                    try:
-                        progress[did]["revenue"] += float(r.get("Revenue", 0))
-                    except Exception:
-                        pass
+                if did in trip_counts:
+                    trip_counts[did] += 1
 
-        lb = []
-        for did, tgt in targets.items():
-            name = driver_names.get(did, "Driver")
-            hit = 0
-            if tgt["type"] == "Trips" and tgt["value"] > 0:
-                hit = progress[did]["trips"] / tgt["value"]
-            elif tgt["type"] == "Revenue" and tgt["value"] > 0:
-                hit = progress[did]["revenue"] / tgt["value"]
+        # Create sorted list
+        rankings: List[Dict[str, Any]] = []
+        for did, count in trip_counts.items():
+            if count > 0:
+                rankings.append({"id": did, "name": driver_names.get(did, "Driver"), "trips": count})
 
-            lb.append({"name": name, "pct": hit * 100, "type": tgt["type"]})
+        # Sort by trips (desc), then name
+        rankings.sort(key=lambda x: (-int(x["trips"]), str(x["name"])))
 
-        lb.sort(key=lambda x: x["pct"], reverse=True)
+        if not rankings:
+            return "No trips recorded today yet! Be the first to top the leaderboard. 🏆"
 
-        if not lb:
-            return "No daily targets set yet! Start a trip to set your goal."
+        # Find viewer's rank
+        viewer_rank = 0
+        viewer_did = str(viewer_id) if viewer_id else ""
+        for i, entry in enumerate(rankings, 1):
+            if entry["id"] == viewer_did:
+                viewer_rank = i
+                break
 
-        text = "🏆 *Live Daily Leaderboard*\n\n"
-        medals = ["🥇", "🥈", "🥉"]
-        for i, driver in enumerate(lb[:5]):
-            medal = medals[i] if i < 3 else "🌟"
-            text += f"{medal} {driver['name']}: {driver['pct']:.1f}% of {driver['type']} Goal Hit\n"  # noqa: E501
+        text = "🏆 *Live Trip Leaderboard (Today)*\n"
+        text += "━━━━━━━━━━━━━━━━━━━━\n\n"
 
+        # Top 5
+        medals = ["🥇", "🥈", "🥉", "4️⃣", "5️⃣"]
+        for i, entry in enumerate(rankings[:5]):
+            medal = medals[i]
+            highlight = " (YOU)" if entry["id"] == viewer_did else ""
+            text += f"{medal} *{entry['name']}*: `{entry['trips']} Trips`{highlight}\n"
+
+        # Show viewer's specific stance if not in top 5
+        if viewer_rank > 5:
+            text += f"\n...\n"
+            text += f"🎖 *Rank #{viewer_rank}*: You have `{trip_counts.get(viewer_did, 0)} Trips` today.\n"
+        elif viewer_rank > 0:
+            text += f"\n🚀 You are in the **Top {viewer_rank}**! Keep going!"
+        else:
+            text += f"\n💡 Start your first trip to enter the rankings!"
+
+        text += f"\n\nTotal active drivers: `{len(rankings)}`"
         return text
 
-    def get_fuel_efficiency_report(self):
+    def get_fuel_efficiency_report(self) -> list[dict[str, Any]]:
         """Calculates KM/L per vehicle from the Trips sheet."""
         trips = self.get_records_safe("Trips")
-        vehicles = {}
+        vehicles: dict[str, dict[str, float]] = {}
 
         for t in trips:
-            v_id = t.get("VehicleID")
-            dist_val = t.get("Distance", 0)
-            fuel_val = t.get("Fuel_Liters", 0)
+            v_id = str(t.get("VehicleID") or t.get("vehicle_id") or "")
+            dist_val = t.get("Distance") or t.get("distance") or 0
+            fuel_val = t.get("Fuel_Liters") or t.get("fuel_liters") or 0
 
             try:
-                dist = float(dist_val) if isinstance(dist_val, (int, float)) else 0
-                fuel = float(fuel_val) if isinstance(fuel_val, (int, float)) else 0
+                dist = float(dist_val)
+                fuel = float(fuel_val)
 
                 if v_id and fuel > 0:
                     if v_id not in vehicles:
                         vehicles[v_id] = {"dist": 0.0, "fuel": 0.0}
                     vehicles[v_id]["dist"] += dist
                     vehicles[v_id]["fuel"] += fuel
-            except Exception:
+            except (ValueError, TypeError):
                 continue
 
-        report = []
+        report: list[dict[str, Any]] = []
         for v_id, stats in vehicles.items():
-            kml = stats["dist"] / stats["fuel"]
-            report.append({"id": v_id, "kml": kml, "total_km": stats["dist"]})
+            if stats["fuel"] > 0:
+                kml = stats["dist"] / stats["fuel"]
+                report.append({"id": v_id, "kml": kml, "total_km": stats["dist"]})
 
         return sorted(report, key=lambda x: x["kml"], reverse=True)

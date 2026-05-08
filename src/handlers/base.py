@@ -11,11 +11,11 @@ logger = logging.getLogger(__name__)
 class BaseHandler:
     """Base class for all Telegram handlers, providing injected services."""
 
-    def __init__(self, sheets: SheetsService, drive: DriveService, attendance: AttendanceService):
+    def __init__(self, sheets: SheetsService, drive: DriveService, attendance: AttendanceService) -> None:
         self.sheets = sheets
         self.drive = drive
         self.attendance = attendance
         self.admin_ids = [int(i.strip()) for i in os.getenv("ADMIN_IDS", "").split(",") if i.strip()]
 
-    def is_admin(self, user_id):
+    def is_admin(self, user_id: int) -> bool:
         return user_id in self.admin_ids

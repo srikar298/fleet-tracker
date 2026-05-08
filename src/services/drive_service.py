@@ -1,34 +1,34 @@
 import io
+import json
 import os
 from datetime import datetime
 
 from google.oauth2.service_account import Credentials
-from googleapiclient.discovery import build
+from googleapiclient.discovery import Resource, build
 from googleapiclient.http import MediaIoBaseUpload
 
 
 class DriveService:
-    def __init__(self):
-        self.folder_id = os.getenv("GOOGLE_DRIVE_FOLDER_ID")
-        self.credentials_file = os.getenv("SERVICE_ACCOUNT_FILE", "credentials.json")
+    def __init__(self) -> None:
+        self.folder_id = str(os.getenv("GOOGLE_DRIVE_FOLDER_ID", ""))
+        self.credentials_file = str(os.getenv("SERVICE_ACCOUNT_FILE", "credentials.json"))
 
         # Scopes for Drive API
         self.scopes = ["https://www.googleapis.com/auth/drive.file"]
 
         json_content = os.getenv("GOOGLE_CREDENTIALS_JSON")
         if json_content:
-            import json
-
             info = json.loads(json_content)
             self.creds = Credentials.from_service_account_info(info, scopes=self.scopes)
         else:
             self.creds = Credentials.from_service_account_file(self.credentials_file, scopes=self.scopes)
-        self.service = build("drive", "v3", credentials=self.creds)
+
+        self.service: Resource = build("drive", "v3", credentials=self.creds)
 
         # Cache for subfolders to avoid redundant API calls
-        self._folder_cache = {}
+        self._folder_cache: dict[str, str] = {}
 
-    def _get_or_create_subfolder(self, name, parent_id):
+    def _get_or_create_subfolder(self, name: str, parent_id: str) -> str:
         """Finds or creates a subfolder within a parent folder."""
         cache_key = f"{parent_id}_{name}"
         if cache_key in self._folder_cache:
@@ -42,7 +42,7 @@ class DriveService:
         files = results.get("files", [])
 
         if files:
-            folder_id = files[0]["id"]
+            folder_id = str(files[0]["id"])
         else:
             file_metadata = {
                 "name": name,
@@ -50,12 +50,12 @@ class DriveService:
                 "parents": [parent_id],
             }
             folder = self.service.files().create(body=file_metadata, fields="id").execute()
-            folder_id = folder.get("id")
+            folder_id = str(folder.get("id"))
 
         self._folder_cache[cache_key] = folder_id
         return folder_id
 
-    def upload_file(self, file_content, driver_name, trip_id, image_type):
+    def upload_file(self, file_content: bytes, driver_name: str, trip_id: str, image_type: str) -> str | None:
         """Uploads a file to a structured cloud hierarchy on Google Drive."""
         try:
             date_str = datetime.now().strftime("%Y-%m-%d")
@@ -74,22 +74,19 @@ class DriveService:
 
             file = self.service.files().create(body=file_metadata, media_body=media, fields="id, webViewLink").execute()
 
-            # Make file viewable by anyone with the link (optional, depends on security needs)
-            # For B2B transparency, we usually want the link to be accessible
+            # Make file viewable by anyone with the link
             self.service.permissions().create(
                 fileId=file.get("id"),
                 body={"type": "anyone", "role": "viewer"},
             ).execute()
 
-            return file.get("webViewLink")
+            return str(file.get("webViewLink"))
         except Exception as e:
             print(f"Error uploading to Cloud Drive: {e}")
             return None
 
-    def flag_trip_images(self, date_str, driver_name, trip_id):
+    def flag_trip_images(self, date_str: str, driver_name: str, trip_id: str) -> bool:
         """Flags a trip by adding a 'FLAGGED' description to the folder."""
-        # Note: In Drive API, we can't easily 'copy' a whole folder structure with one call
-        # but we can rename or add a description for the auditor.
         try:
             date_folder = self._get_or_create_subfolder(date_str, self.folder_id)
             driver_folder = self._get_or_create_subfolder(
@@ -111,7 +108,7 @@ class DriveService:
             print(f"Error flagging cloud folder: {e}")
         return False
 
-    def save_kyc_document(self, file_content, driver_name):
+    def save_kyc_document(self, file_content: bytes, driver_name: str) -> str | None:
         """Saves KYC to a dedicated 'Compliance' subfolder."""
         try:
             kyc_root = self._get_or_create_subfolder("03_Compliance_KYC", self.folder_id)
@@ -123,11 +120,13 @@ class DriveService:
             media = MediaIoBaseUpload(fh, mimetype="image/jpeg")
 
             file = self.service.files().create(body=file_metadata, media_body=media, fields="webViewLink").execute()
-            return file.get("webViewLink")
+            return str(file.get("webViewLink"))
         except Exception:
             return None
 
-    def save_fuel_receipt(self, file_content, driver_name, trip_id, vehicle_id, cost):
+    def save_fuel_receipt(
+        self, file_content: bytes, driver_name: str, trip_id: str, vehicle_id: str, cost: str | float
+    ) -> str | None:
         """Saves fuel receipt both in trip folder and financial reconciliation folder."""
         # 1. Standard upload
         web_link = self.upload_file(file_content, driver_name, trip_id, "fuel_receipt")
@@ -150,7 +149,9 @@ class DriveService:
 
         return web_link
 
-    def save_expense_receipt(self, file_content, driver_name, vehicle_id, expense_amount):
+    def save_expense_receipt(
+        self, file_content: bytes, driver_name: str, vehicle_id: str, expense_amount: str | float
+    ) -> str | None:
         """Saves general expenses to dedicated folder."""
         try:
             expense_root = self._get_or_create_subfolder("02_Expense_Claims", self.folder_id)
@@ -162,11 +163,11 @@ class DriveService:
             fh = io.BytesIO(file_content)
             media = MediaIoBaseUpload(fh, mimetype="image/jpeg")
             file = self.service.files().create(body=file_metadata, media_body=media, fields="webViewLink").execute()
-            return file.get("webViewLink")
+            return str(file.get("webViewLink"))
         except Exception:
             return None
 
-    def save_incident_report(self, file_content, driver_name, vehicle_id):
+    def save_incident_report(self, file_content: bytes, driver_name: str, vehicle_id: str) -> str | None:
         """Saves incident reports to dedicated folder."""
         try:
             incident_root = self._get_or_create_subfolder("04_Incident_Reports", self.folder_id)
@@ -177,6 +178,6 @@ class DriveService:
             fh = io.BytesIO(file_content)
             media = MediaIoBaseUpload(fh, mimetype="image/jpeg")
             file = self.service.files().create(body=file_metadata, media_body=media, fields="webViewLink").execute()
-            return file.get("webViewLink")
+            return str(file.get("webViewLink"))
         except Exception:
             return None

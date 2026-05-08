@@ -1,5 +1,6 @@
 import os
 from datetime import datetime
+from typing import Any
 
 from dotenv import load_dotenv
 
@@ -8,7 +9,7 @@ from services.sheets_service import SheetsService
 load_dotenv()
 
 
-def generate_daily_summary(target_date=None):
+def generate_daily_summary(target_date: str | None = None) -> None:
     if target_date is None:
         target_date = datetime.now().strftime("%Y-%m-%d")
 
@@ -30,7 +31,7 @@ def generate_daily_summary(target_date=None):
         return
 
     # Group by Vehicle
-    summary_data = {}
+    summary_data: dict[Any, dict[str, Any]] = {}
     for t in today_trips:
         vid = t.get("VehicleID") or t.get("vehicle_id")
         did = t.get("DriverID") or t.get("driver_id")
@@ -39,10 +40,10 @@ def generate_daily_summary(target_date=None):
             summary_data[vid] = {
                 "DriverID": did,
                 "TripsCount": 0,
-                "TotalKM": 0,
-                "TotalFuelCost": 0,
-                "TotalOtherExpenses": 0,
-                "TotalRevenue": 0,
+                "TotalKM": 0.0,
+                "TotalFuelCost": 0.0,
+                "TotalOtherExpenses": 0.0,
+                "TotalRevenue": 0.0,
                 "FlagsCount": 0,
                 "Scores": [],
             }
@@ -54,7 +55,7 @@ def generate_daily_summary(target_date=None):
         summary_data[vid]["TotalRevenue"] += float(t.get("Revenue", 0) or t.get("revenue", 0))
 
         flag = t.get("Flag", "") or t.get("flag", "")
-        if flag and "OK" not in flag:
+        if flag and "OK" not in str(flag):
             summary_data[vid]["FlagsCount"] += 1
 
         score = t.get("Driver_Score") or t.get("driver_score", 100)
@@ -63,7 +64,7 @@ def generate_daily_summary(target_date=None):
     # Write to Daily_Summary sheet
     for vid, data in summary_data.items():
         net_profit = data["TotalRevenue"] - data["TotalFuelCost"] - data["TotalOtherExpenses"]
-        avg_score = sum(data["Scores"]) / len(data["Scores"]) if data["Scores"] else 100
+        avg_score = sum(data["Scores"]) / len(data["Scores"]) if data["Scores"] else 100.0
 
         status = "Good"
         if avg_score < 70 or data["FlagsCount"] > 1:
@@ -87,9 +88,7 @@ def generate_daily_summary(target_date=None):
         ]
 
         sheets.append_row("Daily_Summary", row)
-        print(  # noqa: E501
-            f"✅ Added summary for {vid} -> Net Profit: ₹{net_profit} | Status: {status}"
-        )
+        print(f"✅ Added summary for {vid} -> Net Profit: ₹{net_profit} | Status: {status}")
 
 
 if __name__ == "__main__":

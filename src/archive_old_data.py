@@ -7,7 +7,7 @@ from dotenv import load_dotenv
 load_dotenv()
 
 
-def archive_old_data():
+def archive_old_data() -> None:
     print("Starting data archival process...")
     base_dir = os.path.join(os.getcwd(), "trip_images")
     archive_dir = os.path.join(os.getcwd(), "05_Archived_Data")

@@ -12,12 +12,12 @@ logger = logging.getLogger(__name__)
 
 
 class CloudflareR2Service:
-    def __init__(self):
-        self.bucket_name = os.getenv("CLOUDFLARE_R2_BUCKET")
-        self.account_id = os.getenv("CLOUDFLARE_R2_ACCOUNT_ID")
-        self.access_key = os.getenv("CLOUDFLARE_R2_ACCESS_KEY")
-        self.secret_key = os.getenv("CLOUDFLARE_R2_SECRET_KEY")
-        self.public_url = os.getenv("CLOUDFLARE_R2_PUBLIC_URL", "").rstrip("/")
+    def __init__(self) -> None:
+        self.bucket_name = str(os.getenv("CLOUDFLARE_R2_BUCKET", ""))
+        self.account_id = str(os.getenv("CLOUDFLARE_R2_ACCOUNT_ID", ""))
+        self.access_key = str(os.getenv("CLOUDFLARE_R2_ACCESS_KEY", ""))
+        self.secret_key = str(os.getenv("CLOUDFLARE_R2_SECRET_KEY", ""))
+        self.public_url = str(os.getenv("CLOUDFLARE_R2_PUBLIC_URL", "")).rstrip("/")
 
         # R2 Endpoint URL
         self.endpoint_url = f"https://{self.account_id}.r2.cloudflarestorage.com"
@@ -31,13 +31,13 @@ class CloudflareR2Service:
             config=Config(signature_version="s3v4"),
         )
 
-    def _compress_image(self, file_content, max_size_kb=500):
+    def _compress_image(self, file_content: bytes, max_size_kb: int = 500) -> bytes:
         """Resizes and compresses image to stay under target KB size."""
         img = Image.open(io.BytesIO(file_content))
 
         # Convert to RGB if necessary (e.g. for PNGs or RGBA)
         if img.mode in ("RGBA", "P"):
-            img = img.convert("RGB")
+            img = img.convert("RGB")  # type: ignore
 
         quality = 85
         output = io.BytesIO()
@@ -52,7 +52,7 @@ class CloudflareR2Service:
 
         return output.getvalue()
 
-    def upload_file(self, file_content, driver_name, trip_id, image_type):
+    def upload_file(self, file_content: bytes, driver_name: str, trip_id: str, image_type: str) -> str | None:
         """Uploads a file to Cloudflare R2 bucket."""
         try:
             # Compress before upload
@@ -80,7 +80,7 @@ class CloudflareR2Service:
             logger.error(f"❌ Error uploading to R2: {e}")
             return None
 
-    def save_kyc_document(self, file_content, driver_name):
+    def save_kyc_document(self, file_content: bytes, driver_name: str) -> str | None:
         try:
             # Compress before upload
             compressed_content = self._compress_image(file_content)
@@ -97,7 +97,9 @@ class CloudflareR2Service:
             logger.error(f"❌ Error uploading KYC: {e}")
             return None
 
-    def save_fuel_receipt(self, file_content, driver_name, trip_id, vehicle_id, cost):
+    def save_fuel_receipt(
+        self, file_content: bytes, driver_name: str, trip_id: str, vehicle_id: str, cost: str | float
+    ) -> str | None:
         try:
             # Compress before upload
             compressed_content = self._compress_image(file_content)
@@ -117,7 +119,9 @@ class CloudflareR2Service:
             logger.error(f"❌ Error uploading fuel receipt: {e}")
             return None
 
-    def save_expense_receipt(self, file_content, driver_name, vehicle_id, expense_amount):
+    def save_expense_receipt(
+        self, file_content: bytes, driver_name: str, vehicle_id: str, expense_amount: str | float
+    ) -> str | None:
         try:
             # Compress before upload
             compressed_content = self._compress_image(file_content)
@@ -135,7 +139,7 @@ class CloudflareR2Service:
             logger.error(f"❌ Error uploading expense receipt: {e}")
             return None
 
-    def save_incident_report(self, file_content, driver_name, vehicle_id):
+    def save_incident_report(self, file_content: bytes, driver_name: str, vehicle_id: str) -> str | None:
         try:
             # Compress before upload
             compressed_content = self._compress_image(file_content)
@@ -152,7 +156,7 @@ class CloudflareR2Service:
             logger.error(f"❌ Error uploading incident report: {e}")
             return None
 
-    def generate_period_zip(self, prefix):
+    def generate_period_zip(self, prefix: str) -> io.BytesIO | None:
         """Fetches all files under a prefix and returns a ZIP file in memory."""
         try:
             logger.info(f"🔍 Searching R2 for: {prefix}")
@@ -176,7 +180,7 @@ class CloudflareR2Service:
             logger.error(f"❌ Error generating ZIP: {e}")
             return None
 
-    def flag_trip_images(self, date_str, driver_name, trip_id):
+    def flag_trip_images(self, date_str: str, driver_name: str, trip_id: str) -> bool:
         """Flags trip images for audit by logging them."""
         # In R2 we just log the flagging event as we don't have 'starring'
         prefix = f"trips/{date_str}/{driver_name}/{trip_id}"
@@ -184,7 +188,7 @@ class CloudflareR2Service:
         # Optionally, we could copy these to a 'flagged/' folder here
         return True
 
-    def generate_range_zip(self, start_date, end_date):
+    def generate_range_zip(self, start_date: str, end_date: str) -> io.BytesIO | None:
         """Fetches all files between two dates and returns a ZIP."""
         try:
             logger.info(f"🔍 Generating ZIP from {start_date} to {end_date}")

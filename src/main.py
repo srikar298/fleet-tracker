@@ -1,5 +1,7 @@
 import logging
 import os
+import warnings
+from typing import Any
 
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
 from dotenv import load_dotenv
@@ -14,6 +16,7 @@ from telegram.ext import (
     PicklePersistence,
     filters,
 )
+from telegram.warnings import PTBUserWarning
 
 from core.states import (
     ADMIN_BROADCAST,
@@ -60,9 +63,9 @@ load_dotenv()
 
 
 class FleetBot:
-    def __init__(self):
-        self.token = os.getenv("TELEGRAM_BOT_TOKEN")
-        self.admin_ids = [int(i.strip()) for i in os.getenv("ADMIN_IDS", "").split(",") if i.strip()]
+    def __init__(self) -> None:
+        self.token = str(os.getenv("TELEGRAM_BOT_TOKEN", ""))
+        self.admin_ids: list[int] = [int(i.strip()) for i in os.getenv("ADMIN_IDS", "").split(",") if i.strip()]
 
         # Initialize Core Services (Dependency Injection)
         self.sheets = SheetsService()
@@ -80,7 +83,7 @@ class FleetBot:
         self.scheduler = AsyncIOScheduler()
         self.scheduler.add_job(self.backup.run_daily_backup, "cron", hour=0, minute=0)
 
-    def is_admin(self, user_id):
+    def is_admin(self, user_id: int) -> bool:
         return user_id in self.admin_ids
 
     async def post_init(self, application: Application) -> None:
@@ -105,22 +108,34 @@ class FleetBot:
         await application.bot.set_chat_menu_button(menu_button=MenuButtonDefault())
         logger.info("Persistent menu button configured.")
 
-    async def start(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
+    async def start(self, update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+        if not update.effective_user or not update.message:
+            return
         is_admin = self.is_admin(update.effective_user.id)
-        await update.message.reply_text(  # type: ignore
+        await update.message.reply_text(
             "Welcome to FleetTracker! 🚛\nUse the menu below to navigate.",
             reply_markup=get_main_menu(is_admin),
         )
 
-    async def cancel(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
+    async def cancel(self, update: Update, context: ContextTypes.DEFAULT_TYPE) -> Any:
+        if not update.effective_user or not update.message:
+            return None
         is_admin = self.is_admin(update.effective_user.id)
-        await update.message.reply_text(  # type: ignore
-            "Operation cancelled.", reply_markup=get_main_menu(is_admin)
-        )
+        await update.message.reply_text("Operation cancelled.", reply_markup=get_main_menu(is_admin))
         return ConversationHandler.END
 
-    async def today_summary_cmd(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
-        summary = self.sheets.get_driver_today_summary(update.effective_user.id)  # type: ignore
+    async def leaderboard_cmd(self, update: Update, context: ContextTypes.DEFAULT_TYPE) -> Any:
+        if not update.effective_user or not update.message:
+            return None
+        text = self.sheets.get_live_leaderboard(update.effective_user.id)
+        is_admin = self.is_admin(update.effective_user.id)
+        await update.message.reply_text(text, parse_mode="Markdown", reply_markup=get_main_menu(is_admin))
+        return ConversationHandler.END
+
+    async def today_summary_cmd(self, update: Update, context: ContextTypes.DEFAULT_TYPE) -> Any:
+        if not update.effective_user or not update.message:
+            return None
+        summary = self.sheets.get_driver_today_summary(update.effective_user.id)
         is_admin = self.is_admin(update.effective_user.id)
         trip_details = ""
         if summary.get("trip_list"):
@@ -129,29 +144,21 @@ class FleetBot:
                 trip_details += f" {i}. `{d} KM`\n"
 
         text = (
-            f"📊 *Today's Summary*\n"
+            f"📊 *Today's Performance Summary*\n"
             f"━━━━━━━━━━━━━━━━━━━━\n"
-            f"✅ Trips: `{summary['trips']}`\n"
-            f"🛣 Total KM: `{summary['km']:.1f} KM`\n"
-            f"⛽ Spent: `₹{summary['fuel']}`\n"
+            f"✅ Total Trips: `{summary['trips']}`\n"
+            f"🛣 Total Distance: `{summary['km']:.1f} KM`\n"
             f"{trip_details}"
             f"━━━━━━━━━━━━━━━━━━━━"
         )
-        await update.message.reply_text(  # type: ignore
-            text, parse_mode="Markdown", reply_markup=get_main_menu(is_admin)
-        )
+        await update.message.reply_text(text, parse_mode="Markdown", reply_markup=get_main_menu(is_admin))
         return ConversationHandler.END
 
-    async def leaderboard_cmd(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
-        is_admin = self.is_admin(update.effective_user.id)
-        await update.message.reply_text("Fetching live leaderboard... 🔄")  # type: ignore
-        lb_text = self.sheets.get_live_leaderboard()
-        await update.message.reply_text(  # type: ignore
-            lb_text, parse_mode="Markdown", reply_markup=get_main_menu(is_admin)
-        )
-        return ConversationHandler.END
 
-    def run(self):
+    def run(self) -> None:
+        # Silence non-critical Telegram warnings
+        warnings.filterwarnings("ignore", category=PTBUserWarning)
+
         # Persistence for stateful conversations across restarts
         persistence = PicklePersistence(filepath="bot_state.pkl")
 

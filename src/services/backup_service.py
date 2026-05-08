@@ -4,15 +4,18 @@ import logging
 import zipfile
 from datetime import datetime
 
+from services.cloudflare_service import CloudflareR2Service
+from services.sheets_service import SheetsService
+
 logger = logging.getLogger(__name__)
 
 
 class BackupService:
-    def __init__(self, sheets_service, cloudflare_service):
+    def __init__(self, sheets_service: SheetsService, cloudflare_service: CloudflareR2Service) -> None:
         self.sheets = sheets_service
         self.r2 = cloudflare_service
 
-    async def run_daily_backup(self):
+    async def run_daily_backup(self) -> str | None:
         """Backs up all Google Sheets to a ZIP file on Cloudflare R2."""
         try:
             logger.info("Starting daily cloud backup...")

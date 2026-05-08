@@ -1,4 +1,5 @@
 import os
+from typing import Any
 
 from dotenv import load_dotenv
 
@@ -7,7 +8,7 @@ from services.sheets_service import SheetsService
 load_dotenv()
 
 
-def init():
+def init() -> None:
     service = SheetsService()
     if not service.spreadsheet:
         print("❌ Could not connect to Spreadsheet. Check your .env and credentials.json")
@@ -105,7 +106,7 @@ def init():
             print(f"⚠️ Error with sheet '{name}': {e}")
 
 
-def setup_dashboard(ws):
+def setup_dashboard(ws: Any) -> None:
     """Sets up KPI formulas and formatting for the Dashboard sheet"""
     kpis = [
         ["TOTAL FLEET DISTANCE", "=SUM(Trips!M:M)", "KM"],

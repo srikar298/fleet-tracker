@@ -2,8 +2,9 @@ import logging
 import os
 import uuid
 from datetime import datetime
+from typing import Any
 
-from telegram import InlineKeyboardButton, InlineKeyboardMarkup, Update
+from telegram import InlineKeyboardButton, InlineKeyboardMarkup, KeyboardButton, ReplyKeyboardMarkup, Update
 from telegram.ext import ContextTypes, ConversationHandler
 
 from core.states import (
@@ -33,14 +34,15 @@ logger = logging.getLogger(__name__)
 
 class TripHandler(BaseHandler):
     # --- START TRIP FLOW ---
-    async def start_trip_cmd(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
-        if context.user_data.get("active_trip"):  # type: ignore
-            await update.effective_message.reply_text(  # type: ignore
-                "⚠️ You already have an active trip. End it first."
-            )
+    async def start_trip_cmd(self, update: Update, context: ContextTypes.DEFAULT_TYPE) -> Any:
+        if not update.effective_user or not update.effective_message or context.user_data is None:
+            return None
+
+        if context.user_data.get("active_trip"):
+            await update.effective_message.reply_text("⚠️ You already have an active trip. End it first.")
             return ConversationHandler.END
 
-        target = self.attendance.get_daily_target(update.effective_user.id)  # type: ignore
+        target = self.attendance.get_daily_target(update.effective_user.id)
         if not target:
             # Default to 5 Trips as requested
             self.attendance.set_daily_target(
@@ -49,7 +51,7 @@ class TripHandler(BaseHandler):
                 "Trips",
                 5.0,
             )
-            await update.message.reply_text(  # type: ignore
+            await update.effective_message.reply_text(
                 f"Good morning, {update.effective_user.first_name}! ☀️\n"
                 "Your daily target is set to **5 Trips**. Let's get started!",
                 parse_mode="Markdown",
@@ -57,139 +59,143 @@ class TripHandler(BaseHandler):
 
         return await self.prompt_vehicle_selection(update, context)
 
-    async def handle_target_type(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
+    async def handle_target_type(self, update: Update, context: ContextTypes.DEFAULT_TYPE) -> Any:
         query = update.callback_query
-        await query.answer()  # type: ignore
-        tgt_type = query.data.replace("tgt_", "")  # type: ignore
-        context.user_data["target_type"] = tgt_type  # type: ignore
+        if not query or not query.data or context.user_data is None:
+            return None
+        await query.answer()
+        tgt_type = str(query.data.replace("tgt_", ""))
+        context.user_data["target_type"] = tgt_type
 
-        await query.edit_message_text(  # type: ignore
-            f"Awesome! Enter your target number for {tgt_type}:"
-        )
+        await query.edit_message_text(f"Awesome! Enter your target number for {tgt_type}:")
         return DAILY_TARGET_VALUE
 
-    async def handle_target_value(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
+    async def handle_target_value(self, update: Update, context: ContextTypes.DEFAULT_TYPE) -> Any:
+        if not update.message or not update.message.text or not update.effective_user or context.user_data is None:
+            return None
         try:
-            val = float(update.message.text)  # type: ignore
-            tgt_type = context.user_data.get("target_type", "Trips")  # type: ignore
+            val = float(update.message.text)
+            tgt_type = str(context.user_data.get("target_type", "Trips"))
             self.attendance.set_daily_target(
                 update.effective_user.id,
                 "V-MASTER",
                 tgt_type,
-                val,  # type: ignore
+                val,
             )
 
-            await update.message.reply_text(  # type: ignore
-                f"🎯 Target set: {val} {tgt_type}. Let's crush it!"
-            )
+            await update.message.reply_text(f"🎯 Target set: {val} {tgt_type}. Let's crush it!")
             return await self.prompt_vehicle_selection(update, context)
         except ValueError:
-            await update.message.reply_text("Please enter a valid number.")  # type: ignore
+            await update.message.reply_text("Please enter a valid number.")
             return DAILY_TARGET_VALUE
 
-    async def prompt_vehicle_selection(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
+    async def prompt_vehicle_selection(self, update: Update, context: ContextTypes.DEFAULT_TYPE) -> Any:
+        if not update.effective_user:
+            return None
         vehicles = self.sheets.get_all_vehicles()
-        keyboard = [[InlineKeyboardButton(v["plate"], callback_data=f"veh_{v['id']}")] for v in vehicles]
+        keyboard: list[list[InlineKeyboardButton]] = [
+            [InlineKeyboardButton(v["plate"], callback_data=f"veh_{v['id']}")] for v in vehicles
+        ]
         keyboard.append([InlineKeyboardButton("❌ Cancel", callback_data="cancel")])
 
         text = "Select Vehicle:"
-        is_admin = self.is_admin(update.effective_user.id)
-        reply_markup = get_main_menu(is_admin)
 
-        if hasattr(update, "message") and update.message:
+        if update.message:
             await update.message.reply_text(text, reply_markup=InlineKeyboardMarkup(keyboard))
-            # Refresh the reply keyboard too
-            await update.message.reply_text("Trip controls active:", reply_markup=reply_markup)
-        else:
-            await update.callback_query.message.reply_text(  # type: ignore
-                text, reply_markup=InlineKeyboardMarkup(keyboard)
-            )
+        elif update.callback_query:
+            await update.callback_query.edit_message_text(text, reply_markup=InlineKeyboardMarkup(keyboard))
         return START_TRIP_VEHICLE
 
-    async def handle_start_vehicle(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
+    async def handle_start_vehicle(self, update: Update, context: ContextTypes.DEFAULT_TYPE) -> Any:
         query = update.callback_query
-        await query.answer()  # type: ignore
-        if query.data == "cancel":  # type: ignore
-            await query.edit_message_text("Trip cancelled.")  # type: ignore
+        if not query or not query.data or context.user_data is None:
+            return None
+        await query.answer()
+        if query.data == "cancel":
+            await query.edit_message_text("Trip cancelled.")
             return ConversationHandler.END
 
-        vehicle_id = query.data.replace("veh_", "")  # type: ignore
-        context.user_data["vehicle_id"] = vehicle_id  # type: ignore
+        vehicle_id = str(query.data.replace("veh_", ""))
+        context.user_data["vehicle_id"] = vehicle_id
+        
+        v_map = self.sheets.get_vehicle_map()
+        plate = v_map.get(vehicle_id, vehicle_id)
+        
         last_odo = self.sheets.get_vehicle_last_odo(vehicle_id)
-        context.user_data["last_odo"] = last_odo  # type: ignore
+        context.user_data["last_odo"] = last_odo
 
-        await query.edit_message_text(  # type: ignore
-            f"Vehicle: {vehicle_id}\nLast Reading: {last_odo} km\n\nEnter CURRENT Odometer reading:"
+        await query.edit_message_text(
+            f"Vehicle: **{plate}**\nLast Reading: {last_odo} km\n\nEnter CURRENT Odometer reading:",
+            parse_mode="Markdown"
         )
         return START_TRIP_ODO
 
-    async def handle_start_odo(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
+    async def handle_start_odo(self, update: Update, context: ContextTypes.DEFAULT_TYPE) -> Any:
+        if not update.message or not update.message.text or context.user_data is None:
+            return None
         try:
-            odo = float(update.message.text)  # type: ignore
-            context.user_data["start_odo"] = odo  # type: ignore
+            odo = float(update.message.text)
+            context.user_data["start_odo"] = odo
 
-            last_odo = context.user_data.get("last_odo", 0)  # type: ignore
+            last_odo = float(context.user_data.get("last_odo", 0))
             if odo < last_odo:
-                await update.message.reply_text(  # type: ignore
-                    f"❌ Entered KM ({odo}) is less than last trip ({last_odo}). Please recheck:"  # noqa: E501
+                await update.message.reply_text(
+                    f"❌ Entered KM ({odo}) is less than last trip ({last_odo}). Please recheck:"
                 )
                 return START_TRIP_ODO
             elif odo - last_odo > 300:
-                await update.message.reply_text(  # type: ignore
-                    "⚠️ Large jump detected (>300km). We have flagged this for review.\n\nPlease upload a PHOTO of the start odometer:"  # noqa: E501
+                await update.message.reply_text(
+                    "⚠️ Large jump detected (>300km). We have flagged this for review.\n\nPlease upload a PHOTO of the start odometer:"
                 )
             else:
-                await update.message.reply_text(  # type: ignore
-                    "Please upload a PHOTO of the start odometer:"
-                )
+                await update.message.reply_text("Please upload a PHOTO of the start odometer:")
             return START_TRIP_IMAGE
         except ValueError:
-            await update.message.reply_text("Invalid number. Please enter digits only.")  # type: ignore
+            await update.message.reply_text("Please enter a valid number.")
             return START_TRIP_ODO
 
-    async def handle_start_image(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
-        from telegram import KeyboardButton, ReplyKeyboardMarkup
+    async def handle_start_image(self, update: Update, context: ContextTypes.DEFAULT_TYPE) -> Any:
+        if not update.message or not update.message.photo or not update.effective_user or context.user_data is None:
+            return None
 
-        photo_file = await update.message.photo[-1].get_file()  # type: ignore
+        photo_file = await update.message.photo[-1].get_file()
         photo_bytes = await photo_file.download_as_bytearray()
 
-        driver_name = update.effective_user.first_name  # type: ignore
-        trip_id = context.user_data.setdefault("trip_id", str(uuid.uuid4())[:8])  # type: ignore
-        url = self.drive.save_trip_image(
+        driver_name = str(update.effective_user.first_name)
+        trip_id = str(context.user_data.setdefault("trip_id", str(uuid.uuid4())[:8]))
+        url = self.drive.upload_file(
             photo_bytes,
             driver_name,
             trip_id,
             "start",
-            context.user_data.get("vehicle_id", "Unknown"),  # type: ignore
         )
-        context.user_data["start_image_url"] = url  # type: ignore
+        context.user_data["start_image_url"] = url
 
         # Use Native Location Request
         keyboard = [[KeyboardButton("📍 Share Current Location", request_location=True)]]
-        await update.message.reply_text(  # type: ignore
+        await update.message.reply_text(
             "Perfect! Now tap the button below to share your **Live Pickup Location**:",
             parse_mode="Markdown",
             reply_markup=ReplyKeyboardMarkup(keyboard, one_time_keyboard=True, resize_keyboard=True),
         )
         return START_TRIP_LOC
 
-    async def handle_start_loc(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
+    async def handle_start_loc(self, update: Update, context: ContextTypes.DEFAULT_TYPE) -> Any:
+        if not update.message or not update.message.location or not update.effective_user or context.user_data is None:
+            return None
         location = update.message.location
-        if not location:
-            await update.message.reply_text("Please use the button to share your location.")
-            return START_TRIP_LOC
 
         loc_str = f"{location.latitude}, {location.longitude}"
         context.user_data["start_location"] = loc_str
 
-        context.user_data["start_time"] = datetime.now()  # type: ignore
-        context.user_data["active_trip"] = True  # type: ignore
+        context.user_data["start_time"] = datetime.now()
+        context.user_data["active_trip"] = True
 
-        self.attendance.log_activity(update.effective_user.id, "V-MASTER")  # type: ignore
+        self.attendance.log_activity(update.effective_user.id, "V-MASTER")
         self.sheets.update_vehicle_status(
-            context.user_data["vehicle_id"],
+            str(context.user_data["vehicle_id"]),
             context.user_data["start_odo"],
-            "On Trip",  # type: ignore
+            "On Trip",
         )
 
         is_admin = self.is_admin(update.effective_user.id)
@@ -199,22 +205,28 @@ class TripHandler(BaseHandler):
         return ConversationHandler.END
 
     # --- END TRIP FLOW ---
-    async def end_trip_cmd(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
-        if not context.user_data.get("active_trip"):  # type: ignore
-            await update.message.reply_text("⚠️ You don't have an active trip to end.")  # type: ignore
+    async def end_trip_cmd(self, update: Update, context: ContextTypes.DEFAULT_TYPE) -> Any:
+        if not update.message or not update.effective_user or context.user_data is None:
+            return None
+        if not context.user_data.get("active_trip"):
+            await update.message.reply_text("⚠️ You don't have an active trip to end.")
             return ConversationHandler.END
 
         # Auto-detect vehicle_id from active trip
         v_id = context.user_data.get("vehicle_id")
         if v_id:
+            v_map = self.sheets.get_vehicle_map()
+            plate = v_map.get(str(v_id), str(v_id))
             context.user_data["vehicle_id"] = v_id
-            await update.message.reply_text(f"🏁 Ending trip for vehicle: **{v_id}**", parse_mode="Markdown")
+            await update.message.reply_text(f"🏁 Ending trip for vehicle: **{plate}**", parse_mode="Markdown")
             await update.message.reply_text("Enter current ODOMETER reading:")
             return END_TRIP_ODO
 
         # Fallback if vehicle_id was lost (unlikely with persistence)
         vehicles = self.sheets.get_all_vehicles()
-        keyboard = [[InlineKeyboardButton(v["plate"], callback_data=f"endveh_{v['id']}")] for v in vehicles]
+        keyboard: list[list[InlineKeyboardButton]] = [
+            [InlineKeyboardButton(v["plate"], callback_data=f"endveh_{v['id']}")] for v in vehicles
+        ]
         keyboard.append([InlineKeyboardButton("❌ Cancel", callback_data="cancel")])
         await update.message.reply_text(
             "Which vehicle are you ending the trip for?",
@@ -222,196 +234,197 @@ class TripHandler(BaseHandler):
         )
         return END_TRIP_VEHICLE
 
-    async def handle_end_vehicle(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
+    async def handle_end_vehicle(self, update: Update, context: ContextTypes.DEFAULT_TYPE) -> Any:
         query = update.callback_query
-        await query.answer()  # type: ignore
-        if query.data == "cancel":  # type: ignore
-            await query.edit_message_text("Cancelled.")  # type: ignore
+        if not query or not query.data or context.user_data is None:
+            return None
+        await query.answer()
+        if query.data == "cancel":
+            await query.edit_message_text("Cancelled.")
             return ConversationHandler.END
 
-        context.user_data["vehicle_id"] = query.data.replace("endveh_", "")  # type: ignore
-        await query.edit_message_text(  # type: ignore
-            f"Ending trip for {context.user_data['vehicle_id']}. Enter END Odometer:"  # type: ignore
-        )
+        v_id = str(query.data.replace("endveh_", ""))
+        context.user_data["vehicle_id"] = v_id
+        v_map = self.sheets.get_vehicle_map()
+        plate = v_map.get(v_id, v_id)
+        await query.edit_message_text(f"Ending trip for {plate}. Enter END Odometer:")
         return END_TRIP_ODO
 
-    async def handle_end_odo(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
+    async def handle_end_odo(self, update: Update, context: ContextTypes.DEFAULT_TYPE) -> Any:
+        if not update.message or not update.message.text or context.user_data is None:
+            return None
         try:
-            odo = float(update.message.text)  # type: ignore
+            odo = float(update.message.text)
             start_odo = float(context.user_data.get("start_odo", 0))
-
-            # Odometer Validation
             if odo < start_odo:
                 await update.message.reply_text(
-                    f"⚠️ **Error**: End Odometer (`{odo}`) cannot be less than Start Odometer (`{start_odo}`).\n"
-                    "Please check the reading and enter it again:",
-                    parse_mode="Markdown",
+                    f"❌ End KM ({odo}) cannot be less than Start KM ({start_odo}). Try again:"
                 )
                 return END_TRIP_ODO
 
-            context.user_data["end_odo"] = odo  # type: ignore
-            await update.message.reply_text("Upload a PHOTO of the end odometer:")  # type: ignore
+            context.user_data["end_odo"] = odo
+            await update.message.reply_text("Please upload a PHOTO of the final odometer:")
             return END_TRIP_IMAGE
         except ValueError:
-            await update.message.reply_text("Invalid number. Please enter digits only.")  # type: ignore
+            await update.message.reply_text("Please enter a valid number.")
             return END_TRIP_ODO
 
-    async def handle_end_image(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
-        from telegram import KeyboardButton, ReplyKeyboardMarkup
-
-        photo_file = await update.message.photo[-1].get_file()  # type: ignore
+    async def handle_end_image(self, update: Update, context: ContextTypes.DEFAULT_TYPE) -> Any:
+        if not update.message or not update.message.photo or not update.effective_user or context.user_data is None:
+            return None
+        photo_file = await update.message.photo[-1].get_file()
         photo_bytes = await photo_file.download_as_bytearray()
 
-        driver_name = update.effective_user.first_name  # type: ignore
-        trip_id = context.user_data.get("trip_id", "Unknown")  # type: ignore
-        url = self.drive.save_trip_image(
+        driver_name = str(update.effective_user.first_name)
+        trip_id = str(context.user_data.get("trip_id", "Unknown"))
+        url = self.drive.upload_file(
             photo_bytes,
             driver_name,
             trip_id,
             "end",
-            context.user_data.get("vehicle_id", "Unknown"),  # type: ignore
         )
-        context.user_data["end_image_url"] = url  # type: ignore
+        context.user_data["end_image_url"] = url
 
-        # Use Native Location Request
         keyboard = [[KeyboardButton("📍 Share Drop-off Location", request_location=True)]]
-        await update.message.reply_text(  # type: ignore
-            "Now tap the button below to share your **Live Drop-off Location**:",
-            parse_mode="Markdown",
+        await update.message.reply_text(
+            "Now share your **Live Drop-off Location**:",
             reply_markup=ReplyKeyboardMarkup(keyboard, one_time_keyboard=True, resize_keyboard=True),
         )
         return END_TRIP_LOC
 
-    async def handle_end_loc(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
+    async def handle_end_loc(self, update: Update, context: ContextTypes.DEFAULT_TYPE) -> Any:
+        if not update.message or not update.message.location or context.user_data is None:
+            return None
         location = update.message.location
-        if not location:
-            await update.message.reply_text("Please use the button to share your location.")
-            return END_TRIP_LOC
 
         loc_str = f"{location.latitude}, {location.longitude}"
         context.user_data["end_location"] = loc_str
         await update.message.reply_text("Location captured! 📍")
 
-        context.user_data["end_time"] = datetime.now()  # type: ignore
+        context.user_data["end_time"] = datetime.now()
 
-        keyboard = [
+        keyboard: list[list[InlineKeyboardButton]] = [
             [
                 InlineKeyboardButton("✅ Yes", callback_data="fuel_yes"),
                 InlineKeyboardButton("❌ No", callback_data="fuel_no"),
             ]
         ]
-        await update.message.reply_text(  # type: ignore
+        await update.message.reply_text(
             "Did you refuel during this trip?",
             reply_markup=InlineKeyboardMarkup(keyboard),
         )
         return FUEL_PROMPT
 
-    async def handle_fuel_prompt(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
+    async def handle_fuel_prompt(self, update: Update, context: ContextTypes.DEFAULT_TYPE) -> Any:
         query = update.callback_query
-        await query.answer()  # type: ignore
-        if query.data == "fuel_yes":  # type: ignore
-            await query.edit_message_text("Enter Liters and Cost (e.g., '20, 2000'):")  # type: ignore
+        if not query or not query.data or context.user_data is None:
+            return None
+        await query.answer()
+        if query.data == "fuel_yes":
+            await query.edit_message_text("Enter Liters and Cost (e.g., '20, 2000'):")
             return FUEL_DATA
         else:
-            context.user_data["fuel_liters"] = "0"  # type: ignore
-            context.user_data["fuel_cost"] = "0"  # type: ignore
-            await query.edit_message_text("Enter Total Revenue for this trip (in ₹):")  # type: ignore
+            context.user_data["fuel_liters"] = "0"
+            context.user_data["fuel_cost"] = "0"
+            await query.edit_message_text("Enter Total Revenue for this trip (in ₹):")
             return END_TRIP_REVENUE
 
-    async def handle_fuel_data(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
-        data = update.message.text.split(",")  # type: ignore
-        liters = data[0].strip()
-        cost = data[1].strip() if len(data) > 1 else "0"
+    async def handle_fuel_data(self, update: Update, context: ContextTypes.DEFAULT_TYPE) -> Any:
+        if not update.message or not update.message.text or context.user_data is None:
+            return None
+        parts = update.message.text.split(",")
+        liters = parts[0].strip()
+        cost = parts[1].strip() if len(parts) > 1 else "0"
 
-        context.user_data["fuel_liters"] = liters  # type: ignore
-        context.user_data["fuel_cost"] = cost  # type: ignore
+        context.user_data["fuel_liters"] = liters
+        context.user_data["fuel_cost"] = cost
 
         try:
-            start = float(context.user_data.get("start_odo", 0))  # type: ignore
+            start = float(context.user_data.get("start_odo", 0))
             if start == 0:
-                start = float(
-                    self.sheets.get_vehicle_last_odo(
-                        context.user_data.get("vehicle_id")  # type: ignore
-                    )
-                )
-            end = float(context.user_data.get("end_odo", 0))  # type: ignore
+                start = float(self.sheets.get_vehicle_last_odo(str(context.user_data.get("vehicle_id", "Unknown"))))
+            end = float(context.user_data.get("end_odo", 0))
             distance = end - start
             liters_val = float(liters)
             if liters_val > 0:
                 mileage = distance / liters_val
-                context.user_data["mileage"] = mileage  # type: ignore
-                await update.message.reply_text(  # type: ignore
-                    f"⚠️ Your mileage: {mileage:.1f} km/l (Expected: 12-15)"
-                )
+                context.user_data["mileage"] = mileage
+                await update.message.reply_text(f"⚠️ Your mileage: {mileage:.1f} km/l (Expected: 12-15)")
         except Exception:
             pass
 
-        await update.message.reply_text("Upload a photo of the FUEL RECEIPT:")  # type: ignore
+        await update.message.reply_text("Upload a photo of the FUEL RECEIPT:")
         return FUEL_IMAGE
 
-    async def handle_fuel_image(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
-        photo_file = await update.message.photo[-1].get_file()  # type: ignore
+    async def handle_fuel_image(self, update: Update, context: ContextTypes.DEFAULT_TYPE) -> Any:
+        if not update.message or not update.message.photo or not update.effective_user or context.user_data is None:
+            return None
+        photo_file = await update.message.photo[-1].get_file()
         photo_bytes = await photo_file.download_as_bytearray()
 
-        driver_name = update.effective_user.first_name  # type: ignore
-        trip_id = context.user_data.setdefault("trip_id", str(uuid.uuid4())[:8])  # type: ignore
+        driver_name = str(update.effective_user.first_name)
+        trip_id = str(context.user_data.get("trip_id", str(uuid.uuid4())[:8]))
         url = self.drive.save_fuel_receipt(
             photo_bytes,
             driver_name,
             trip_id,
-            context.user_data.get("vehicle_id", "Unknown"),  # type: ignore
-            context.user_data.get("fuel_cost", 0),  # type: ignore
+            str(context.user_data.get("vehicle_id", "Unknown")),
+            context.user_data.get("fuel_cost", 0),
         )
-        context.user_data["fuel_image_url"] = url  # type: ignore
+        context.user_data["fuel_image_url"] = url
 
-        await update.message.reply_text(  # type: ignore
-            "Any other expenses? (Toll/Parking/Maintenance)\nEnter total amount (or 0):"
-        )
+        await update.message.reply_text("Any other expenses? (Toll/Parking/Maintenance)\nEnter total amount (or 0):")
         return END_TRIP_OTHER_EXP
 
-    async def handle_end_revenue(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
+    async def handle_end_revenue(self, update: Update, context: ContextTypes.DEFAULT_TYPE) -> Any:
+        if not update.message or not update.message.text or context.user_data is None:
+            return None
         try:
-            context.user_data["revenue"] = float(update.message.text)  # type: ignore
-            await update.message.reply_text(  # type: ignore
-                "Any other expenses? (Toll/Parking/Maintenance)\nEnter total amount (or 0):"  # noqa: E501
+            context.user_data["revenue"] = float(update.message.text)
+            await update.message.reply_text(
+                "Any other expenses? (Toll/Parking/Maintenance)\nEnter total amount (or 0):"
             )
             return END_TRIP_OTHER_EXP
         except ValueError:
-            await update.message.reply_text("Invalid number. Try again:")  # type: ignore
+            await update.message.reply_text("Invalid number. Try again:")
             return END_TRIP_REVENUE
 
-    async def handle_end_other_exp(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
+    async def handle_end_other_exp(self, update: Update, context: ContextTypes.DEFAULT_TYPE) -> Any:
+        if not update.message or not update.message.text or context.user_data is None:
+            return None
         try:
-            other = float(update.message.text)  # type: ignore
-            context.user_data["other_expenses"] = other  # type: ignore
+            other = float(update.message.text)
+            context.user_data["other_expenses"] = other
             if other > 0:
-                await update.message.reply_text(  # type: ignore
-                    "Please upload a photo of the receipt for this expense (Toll/Maintenance):"  # noqa: E501
+                await update.message.reply_text(
+                    "Please upload a photo of the receipt for this expense (Toll/Maintenance):"
                 )
                 return END_TRIP_EXPENSE_PHOTO
             else:
                 return await self.show_end_summary(update, context)
         except ValueError:
-            await update.message.reply_text("Invalid number. Try again:")  # type: ignore
+            await update.message.reply_text("Invalid number. Try again:")
             return END_TRIP_OTHER_EXP
 
-    async def handle_end_expense_photo(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
-        photo_file = await update.message.photo[-1].get_file()  # type: ignore
+    async def handle_end_expense_photo(self, update: Update, context: ContextTypes.DEFAULT_TYPE) -> Any:
+        if not update.message or not update.message.photo or not update.effective_user or context.user_data is None:
+            return None
+        photo_file = await update.message.photo[-1].get_file()
         photo_bytes = await photo_file.download_as_bytearray()
 
-        driver_name = update.effective_user.first_name  # type: ignore
-        v_id = context.user_data.get("vehicle_id", "Unknown")  # type: ignore
-        cost = context.user_data.get("other_expenses", 0)  # type: ignore
-        trip_id = context.user_data.get("trip_id", "Unknown")  # type: ignore
+        driver_name = str(update.effective_user.first_name)
+        v_id = str(context.user_data.get("vehicle_id", "Unknown"))
+        cost = context.user_data.get("other_expenses", 0)
+        trip_id = str(context.user_data.get("trip_id", "Unknown"))
 
         url = self.drive.save_expense_receipt(photo_bytes, driver_name, v_id, cost)
-        context.user_data["expense_image_url"] = url  # type: ignore
+        context.user_data["expense_image_url"] = url
 
         # Alert Admins for Approval
         admin_ids = [int(i.strip()) for i in os.getenv("ADMIN_IDS", "").split(",") if i.strip()]
         for admin_id in admin_ids:
             try:
-                keyboard = [
+                keyboard: list[list[InlineKeyboardButton]] = [
                     [
                         InlineKeyboardButton("✅ Approve", callback_data=f"approve_{trip_id}"),
                         InlineKeyboardButton("❌ Reject", callback_data=f"reject_{trip_id}"),
@@ -436,22 +449,22 @@ class TripHandler(BaseHandler):
 
         return await self.show_end_summary(update, context)
 
-    async def show_end_summary(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
-        start = context.user_data.get("start_odo")  # type: ignore
+    async def show_end_summary(self, update: Update, context: ContextTypes.DEFAULT_TYPE) -> Any:
+        if not update.effective_message or context.user_data is None:
+            return None
+        start = context.user_data.get("start_odo")
         if start is None:
-            start = self.sheets.get_vehicle_last_odo(
-                context.user_data.get("vehicle_id", "Unknown")  # type: ignore
-            )
-            context.user_data["start_odo"] = start  # type: ignore
+            start = self.sheets.get_vehicle_last_odo(str(context.user_data.get("vehicle_id", "Unknown")))
+            context.user_data["start_odo"] = start
 
-        end = context.user_data.get("end_odo", 0)  # type: ignore
+        end = float(context.user_data.get("end_odo", 0))
         distance = end - float(start)
-        fuel = float(context.user_data.get("fuel_cost", 0))  # type: ignore
-        other = context.user_data.get("other_expenses", 0)  # type: ignore
+        fuel = float(context.user_data.get("fuel_cost", 0))
+        other = float(context.user_data.get("other_expenses", 0))
         total_expenses = fuel + other
 
-        context.user_data["distance"] = distance  # type: ignore
-        context.user_data["total_expenses"] = total_expenses  # type: ignore
+        context.user_data["distance"] = distance
+        context.user_data["total_expenses"] = total_expenses
 
         summary = (
             f"📊 *Trip Summary*\n"
@@ -463,58 +476,54 @@ class TripHandler(BaseHandler):
             f"💰 *Total Spent*: `₹{total_expenses}`\n"
         )
 
-        keyboard = [
+        keyboard: list[list[InlineKeyboardButton]] = [
             [
                 InlineKeyboardButton("✅ Confirm", callback_data="confirm"),
                 InlineKeyboardButton("❌ Cancel", callback_data="cancel"),
             ]
         ]
 
-        if hasattr(update, "message") and update.message:
-            await update.message.reply_text(
-                summary,
-                parse_mode="Markdown",
-                reply_markup=InlineKeyboardMarkup(keyboard),
-            )
-        else:
-            await update.callback_query.message.reply_text(  # type: ignore
-                summary,
-                parse_mode="Markdown",
-                reply_markup=InlineKeyboardMarkup(keyboard),
-            )
-
+        await update.effective_message.reply_text(
+            summary,
+            parse_mode="Markdown",
+            reply_markup=InlineKeyboardMarkup(keyboard),
+        )
         return END_TRIP_SUMMARY
 
-    async def handle_end_summary(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
+    async def handle_end_summary(self, update: Update, context: ContextTypes.DEFAULT_TYPE) -> Any:
         query = update.callback_query
-        await query.answer()  # type: ignore
-        if query.data == "confirm":  # type: ignore
-            await query.edit_message_text("Saving trip...")  # type: ignore
+        if not query or not query.data or context.user_data is None:
+            return None
+        await query.answer()
+        if query.data == "confirm":
+            await query.edit_message_text("Saving trip...")
             await self.complete_trip(update, context)
         else:
-            await query.edit_message_text("Trip submission cancelled. Data discarded.")  # type: ignore
-            context.user_data["active_trip"] = False  # type: ignore
+            await query.edit_message_text("Trip submission cancelled. Data discarded.")
+            context.user_data["active_trip"] = False
         return ConversationHandler.END
 
-    async def complete_trip(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
+    async def complete_trip(self, update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+        if not update.effective_user or not update.effective_message or context.user_data is None:
+            return
         try:
-            distance = context.user_data.get("distance", 0)  # type: ignore
-            start_time = context.user_data.get("start_time", datetime.now())  # type: ignore
-            end_time = context.user_data.get("end_time", datetime.now())  # type: ignore
+            distance = float(context.user_data.get("distance", 0))
+            start_time = context.user_data.get("start_time", datetime.now())
+            end_time = context.user_data.get("end_time", datetime.now())
             duration = int((end_time - start_time).total_seconds() / 60)
 
-            trip_data = {
+            trip_data: dict[str, Any] = {
                 "distance": distance,
                 "duration_mins": duration,
-                "mileage": context.user_data.get("mileage", 0),  # type: ignore
-                "fuel_cost": float(context.user_data.get("fuel_cost", 0)),  # type: ignore
-                "revenue": context.user_data.get("revenue", 0),  # type: ignore
+                "mileage": context.user_data.get("mileage", 0),
+                "fuel_cost": float(context.user_data.get("fuel_cost", 0)),
+                "revenue": float(context.user_data.get("revenue", 0)),
             }
 
             validator = TripValidator()
             flags, score = validator.evaluate_trip(trip_data)
 
-            trip_id = context.user_data.get("trip_id", str(uuid.uuid4())[:8])  # type: ignore
+            trip_id = str(context.user_data.get("trip_id", str(uuid.uuid4())[:8]))
             date = datetime.now().strftime("%Y-%m-%d")
 
             flag_str = ", ".join(flags) if flags else "OK"
@@ -522,41 +531,41 @@ class TripHandler(BaseHandler):
                 flag_str = "🚩 " + flag_str
                 self.drive.flag_trip_images(
                     date,
-                    update.effective_user.first_name,
-                    trip_id,  # type: ignore
+                    str(update.effective_user.first_name),
+                    trip_id,
                 )
 
-            trip_record = {
+            trip_record: dict[str, Any] = {
                 "trip_id": trip_id,
                 "date": date,
                 "vendor_id": "V-MASTER",
-                "driver_id": update.effective_user.id,  # type: ignore
-                "vehicle_id": context.user_data.get("vehicle_id", "Unknown"),  # type: ignore
+                "driver_id": update.effective_user.id,
+                "vehicle_id": context.user_data.get("vehicle_id", "Unknown"),
                 "start_time": start_time.strftime("%H:%M:%S"),
                 "end_time": end_time.strftime("%H:%M:%S"),
                 "duration": duration,
-                "start_location": context.user_data.get("start_location"),  # type: ignore
-                "end_location": context.user_data.get("end_location"),  # type: ignore
-                "start_odo": context.user_data.get("start_odo", 0),  # type: ignore
-                "end_odo": context.user_data.get("end_odo", 0),  # type: ignore
+                "start_location": context.user_data.get("start_location"),
+                "end_location": context.user_data.get("end_location"),
+                "start_odo": context.user_data.get("start_odo", 0),
+                "end_odo": context.user_data.get("end_odo", 0),
                 "distance": "=L{row}-K{row}",
-                "fuel_liters": context.user_data.get("fuel_liters", 0),  # type: ignore
-                "fuel_cost": context.user_data.get("fuel_cost", 0),  # type: ignore
-                "other_expenses": context.user_data.get("other_expenses", 0),  # type: ignore
-                "revenue": context.user_data.get("revenue", 0),  # type: ignore
+                "fuel_liters": context.user_data.get("fuel_liters", 0),
+                "fuel_cost": context.user_data.get("fuel_cost", 0),
+                "other_expenses": context.user_data.get("other_expenses", 0),
+                "revenue": context.user_data.get("revenue", 0),
                 "net_profit": "=Q{row}-O{row}-P{row}",
                 "driver_score": score,
-                "start_image": context.user_data.get("start_image_url"),  # type: ignore
-                "end_image": context.user_data.get("end_image_url"),  # type: ignore
-                "fuel_image": context.user_data.get("fuel_image_url"),  # type: ignore
+                "start_image": context.user_data.get("start_image_url"),
+                "end_image": context.user_data.get("end_image_url"),
+                "fuel_image": context.user_data.get("fuel_image_url"),
                 "flag": flag_str,
-                "remarks": "B2B Trip recorded",  # type: ignore
+                "remarks": "B2B Trip recorded",
             }
 
             self.sheets.record_trip(trip_record)
             self.sheets.update_vehicle_status(
-                context.user_data.get("vehicle_id", "Unknown"),  # type: ignore
-                context.user_data.get("end_odo", 0),  # type: ignore
+                str(context.user_data.get("vehicle_id", "Unknown")),
+                context.user_data.get("end_odo", 0),
                 "Idle",
             )
 
@@ -575,20 +584,22 @@ class TripHandler(BaseHandler):
                     text, parse_mode="Markdown", reply_markup=get_main_menu(is_admin)
                 )
             else:
-                await update.effective_message.reply_text(  # type: ignore
+                await update.effective_message.reply_text(
                     f"✅ Trip successfully recorded in the ledger!\nTrip ID: {trip_id}",
                     reply_markup=get_main_menu(is_admin),
                 )
         except Exception as e:
             logger.error(f"Error completing trip: {e}")
-            await update.effective_message.reply_text(  # type: ignore
+            await update.effective_message.reply_text(
                 "⚠️ An error occurred while saving the trip. Please contact admin."
             )
         finally:
             self._clear_trip_data(context)
 
-    def _clear_trip_data(self, context: ContextTypes.DEFAULT_TYPE):
+    def _clear_trip_data(self, context: ContextTypes.DEFAULT_TYPE) -> None:
         """Resets trip-specific data but keeps vehicle and last odo for carry-over."""
+        if context.user_data is None:
+            return
         if "end_odo" in context.user_data:
             context.user_data["last_odo"] = context.user_data["end_odo"]
 
@@ -610,8 +621,5 @@ class TripHandler(BaseHandler):
             "distance",
             "net",
         ]
-        # NOTE: We do NOT clear vehicle_id here so it carries over to the next trip!
         for key in keys_to_clear:
-            if key in context.user_data:
-                del context.user_data[key]
-        logger.info("🧹 Session prepared for next trip (Vehicle & Odo preserved).")
+            context.user_data.pop(key, None)

@@ -1,16 +1,16 @@
-from telegram import ReplyKeyboardMarkup
+from telegram import KeyboardButton, ReplyKeyboardMarkup
 
 
-def get_main_menu(is_admin=False):
-    keyboard = [
-        ["🚗 Start Trip", "🛑 End Trip"],
-        ["📊 Today Summary", "🏆 Leaderboard"],
-        ["⚠️ Report Damage", "👤 Profile"],
+def get_main_menu(is_admin: bool = False) -> ReplyKeyboardMarkup:
+    """Returns the primary navigation keyboard."""
+    keyboard: list[list[KeyboardButton]] = [
+        [KeyboardButton("🚗 Start Trip"), KeyboardButton("🛑 End Trip")],
+        [KeyboardButton("📊 Today Summary"), KeyboardButton("🏆 Leaderboard")],
+        [KeyboardButton("👤 Profile"), KeyboardButton("⚠️ Report Damage")],
     ]
-
     if is_admin:
-        keyboard.append(["👨‍✈️ Admin Panel"])
+        keyboard.append([KeyboardButton("👨‍✈️ Admin Panel")])
 
-    keyboard.append(["❌ Cancel"])
+    keyboard.append([KeyboardButton("❌ Cancel")])
 
-    return ReplyKeyboardMarkup(keyboard, resize_keyboard=True)
+    return ReplyKeyboardMarkup(keyboard, resize_keyboard=True, one_time_keyboard=False)

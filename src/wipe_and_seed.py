@@ -5,7 +5,7 @@ from services.sheets_service import SheetsService
 load_dotenv()
 
 
-def wipe_and_seed():
+def wipe_and_seed() -> None:
     service = SheetsService()
     if not service.spreadsheet:
         print("Could not connect to Spreadsheet.")
