@@ -21,14 +21,11 @@ class SheetsService:
             json_content = os.getenv("GOOGLE_CREDENTIALS_JSON")
             if json_content:
                 import json
+
                 info = json.loads(json_content)
-                self.creds = Credentials.from_service_account_info(
-                    info, scopes=self.scope
-                )
+                self.creds = Credentials.from_service_account_info(info, scopes=self.scope)
             else:
-                self.creds = Credentials.from_service_account_file(
-                    self.credentials_path, scopes=self.scope
-                )
+                self.creds = Credentials.from_service_account_file(self.credentials_path, scopes=self.scope)
             self.client = gspread.authorize(self.creds)
             self.spreadsheet = self.client.open_by_key(self.sheet_id)
         except Exception as e:
@@ -39,6 +36,16 @@ class SheetsService:
         if not self.spreadsheet:
             return None
         return self.spreadsheet.worksheet(name)
+
+    def get_records_safe(self, name):
+        """Safely fetches all records from a worksheet."""
+        sheet = self.get_sheet(name)
+        if not sheet:
+            return []
+        try:
+            return sheet.get_all_records()
+        except Exception:
+            return []
 
     def append_row(self, sheet_name, data):
         sheet = self.get_sheet(sheet_name)
@@ -81,9 +88,7 @@ class SheetsService:
 
         records = sheet.get_all_records()
         return [
-            {"id": str(v.get("VehicleID")), "plate": str(v.get("LicensePlate"))}
-            for v in records
-            if v.get("VehicleID")
+            {"id": str(v.get("VehicleID")), "plate": str(v.get("LicensePlate"))} for v in records if v.get("VehicleID")
         ]
 
     def update_vehicle_status(self, vehicle_id, odo, status="Idle"):
@@ -101,9 +106,7 @@ class SheetsService:
 
     def register_driver(self, driver_id, name, license, phone, vendor_id="V-MASTER"):
         """Registers a new driver in Master_Drivers"""
-        return self.append_row(
-            "Master_Drivers", [driver_id, name, license, vendor_id, phone, "Active"]
-        )
+        return self.append_row("Master_Drivers", [driver_id, name, license, vendor_id, phone, "Active"])
 
     def record_trip(self, trip_data):
         """Appends a final trip record to the Trips sheet"""
@@ -154,9 +157,7 @@ class SheetsService:
 
         for r in records:
             # Match date and driver
-            if (r.get("Date") == today or r.get("date") == today) and str(
-                r.get("DriverID")
-            ) == str(driver_id):
+            if (r.get("Date") == today or r.get("date") == today) and str(r.get("DriverID")) == str(driver_id):
                 trips += 1
                 try:
                     km += float(r.get("Distance", 0))
@@ -191,10 +192,7 @@ class SheetsService:
         if not att_sheet or not trips_sheet or not master_drivers:
             return "Unable to fetch leaderboard."
 
-        driver_names = {
-            str(d.get("DriverID")): d.get("Name", "Unknown")
-            for d in master_drivers.get_all_records()
-        }
+        driver_names = {str(d.get("DriverID")): d.get("Name", "Unknown") for d in master_drivers.get_all_records()}
 
         targets = {}
         for r in att_sheet.get_all_records():
@@ -238,3 +236,32 @@ class SheetsService:
             text += f"{medal} {driver['name']}: {driver['pct']:.1f}% of {driver['type']} Goal Hit\n"  # noqa: E501
 
         return text
+
+    def get_fuel_efficiency_report(self):
+        """Calculates KM/L per vehicle from the Trips sheet."""
+        trips = self.get_records_safe("Trips")
+        vehicles = {}
+
+        for t in trips:
+            v_id = t.get("VehicleID")
+            dist_val = t.get("Distance", 0)
+            fuel_val = t.get("Fuel_Liters", 0)
+
+            try:
+                dist = float(dist_val) if isinstance(dist_val, (int, float)) else 0
+                fuel = float(fuel_val) if isinstance(fuel_val, (int, float)) else 0
+
+                if v_id and fuel > 0:
+                    if v_id not in vehicles:
+                        vehicles[v_id] = {"dist": 0.0, "fuel": 0.0}
+                    vehicles[v_id]["dist"] += dist
+                    vehicles[v_id]["fuel"] += fuel
+            except Exception:
+                continue
+
+        report = []
+        for v_id, stats in vehicles.items():
+            kml = stats["dist"] / stats["fuel"]
+            report.append({"id": v_id, "kml": kml, "total_km": stats["dist"]})
+
+        return sorted(report, key=lambda x: x["kml"], reverse=True)
