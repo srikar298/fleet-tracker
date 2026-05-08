@@ -155,33 +155,20 @@ class CloudflareR2Service:
     def generate_period_zip(self, prefix):
         """Fetches all files under a prefix and returns a ZIP file in memory."""
         try:
-            logger.info(f"🔍 Auditing R2 Bucket: {self.bucket_name} for prefix: {prefix}")
-
-            # Debug: List EVERYTHING in the bucket to see what's actually there
-            debug_list = self.s3_client.list_objects_v2(Bucket=self.bucket_name, MaxKeys=10)
-            if "Contents" in debug_list:
-                keys = [obj["Key"] for obj in debug_list["Contents"]]
-                logger.info(f"📁 Current files in bucket (sample): {keys}")
-            else:
-                logger.warning("📭 Bucket appears to be empty during audit.")
-
+            logger.info(f"🔍 Searching R2 for: {prefix}")
             response = self.s3_client.list_objects_v2(Bucket=self.bucket_name, Prefix=prefix)
 
             if "Contents" not in response:
-                logger.warning(f"⚠️ No files found for prefix {prefix}")
+                logger.warning(f"⚠️ No files found for: {prefix}")
                 return None
-
-            count = len(response["Contents"])
-            logger.info(f"📦 Found {count} photos. Generating ZIP...")
 
             zip_buffer = io.BytesIO()
             with zipfile.ZipFile(zip_buffer, "w") as zip_file:
                 for obj in response["Contents"]:
                     file_key = obj["Key"]
                     file_data = self.s3_client.get_object(Bucket=self.bucket_name, Key=file_key)["Body"].read()
-                    # Flatten folder structure in ZIP for easier viewing
-                    zip_filename = file_key.replace("/", "_")
-                    zip_file.writestr(zip_filename, file_data)
+                    # Preserve the original key (path) inside the ZIP
+                    zip_file.writestr(file_key, file_data)
 
             zip_buffer.seek(0)
             return zip_buffer
