@@ -575,20 +575,32 @@ class TripHandler(BaseHandler):
 
             # Milestone Check
             summary = self.sheets.get_driver_today_summary(update.effective_user.id)
-            if summary["trips"] == 5:
+            trips_done = summary["trips"]
+            target = 5
+            
+            if trips_done >= target:
                 text = (
-                    "🏆 *Target Reached!* 🏆\n"
+                    "🏆 *Daily Goal Reached!* 🏆\n"
                     "━━━━━━━━━━━━━━━━━━━━\n"
-                    "You have successfully completed **5 trips** today! Excellent work.\n\n"
-                    "Do you want to continue and make more trips for extra earnings?"
+                    f"That was trip number **{trips_done}** today! Excellent work.\n\n"
+                    "You've smashed your target. Do you want to keep going for extra rewards?"
                 )
                 await update.effective_message.reply_text(
                     text, parse_mode="Markdown", reply_markup=get_main_menu(is_admin)
                 )
             else:
+                trips_left = target - trips_done
+                ordinal = {1: "st", 2: "nd", 3: "rd"}.get(trips_done % 10, "th") if not 11 <= trips_done <= 13 else "th"
+                
+                text = (
+                    "✅ *Trip Recorded!* ✅\n"
+                    "━━━━━━━━━━━━━━━━━━━━\n"
+                    f"Great job! That was your **{trips_done}{ordinal}** trip today.\n"
+                    f"🚀 **{trips_left}** more to go to reach your daily goal of {target}!\n\n"
+                    f"_Trip ID: {trip_id}_"
+                )
                 await update.effective_message.reply_text(
-                    f"✅ Trip successfully recorded in the ledger!\nTrip ID: {trip_id}",
-                    reply_markup=get_main_menu(is_admin),
+                    text, parse_mode="Markdown", reply_markup=get_main_menu(is_admin)
                 )
         except Exception as e:
             logger.error(f"Error completing trip: {e}")
