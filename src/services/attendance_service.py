@@ -112,7 +112,66 @@ class AttendanceService:
                     earnings = daily_base + (extra * incentive_per_trip)
                 
                 sheet.update_cell(i, 11, round(earnings, 2))
+                
+                # 4. Update Monthly_Payroll Live
+                self.update_monthly_payroll_live(driver_id, today[:7], earnings)
                 return
+
+    def update_monthly_payroll_live(self, driver_id: str | int, month_str: str, daily_earnings: float) -> None:
+        """Updates the Monthly_Payroll sheet in real-time"""
+        payroll_ws = self.sheets.get_sheet("Monthly_Payroll")
+        attendance_ws = self.sheets.get_sheet("Attendance")
+        if not payroll_ws or not attendance_ws:
+            return
+
+        # 1. Aggregate Month Data from Attendance
+        records = attendance_ws.get_all_records()
+        present_days = 0
+        total_extra_bonus = 0.0
+        total_shortfall = 0.0
+        daily_base = 1038.5
+        
+        for r in records:
+            if str(r.get("DriverID")) == str(driver_id) and str(r.get("Date")).startswith(month_str):
+                status = str(r.get("Status"))
+                if status == "Present":
+                    present_days += 1
+                    e = float(r.get("Daily_Earnings") or 0)
+                    if e > daily_base:
+                        total_extra_bonus += (e - daily_base)
+                    elif e < daily_base:
+                        total_shortfall += (daily_base - e)
+
+        # 2. Update or Create Row in Monthly_Payroll
+        p_records = payroll_ws.get_all_records()
+        row_idx = -1
+        for i, pr in enumerate(p_records, start=2):
+            if str(pr.get("DriverID")) == str(driver_id) and str(pr.get("Month")) == month_str:
+                row_idx = i
+                break
+        
+        base_salary = 27000.0
+        working_days = 26
+        # Net Payout = (Base / 26 * Present) + Bonus - Shortfall
+        net_payout = (base_salary / working_days * present_days) + total_extra_bonus - total_shortfall
+
+        row_data = [
+            month_str,
+            driver_id,
+            base_salary,
+            working_days,
+            present_days,
+            0, # Holidays (Admin)
+            0, # Sick/LOP (Admin)
+            round(total_extra_bonus, 2),
+            round(total_shortfall, 2),
+            round(max(0, net_payout), 2)
+        ]
+
+        if row_idx != -1:
+            payroll_ws.update(values=[row_data], range_name=f"A{row_idx}:J{row_idx}")
+        else:
+            payroll_ws.append_row(row_data)
 
     def generate_monthly_payroll(self, month_str: str) -> bool:
         """Aggregates attendance data into Monthly_Payroll sheet for a given month (YYYY-MM)"""
