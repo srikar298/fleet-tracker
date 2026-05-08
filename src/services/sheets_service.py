@@ -1,4 +1,5 @@
 import os
+from typing import Any
 
 import gspread
 from dotenv import load_dotenv
@@ -8,7 +9,7 @@ load_dotenv()
 
 
 class SheetsService:
-    def __init__(self):
+    def __init__(self) -> None:
         self.scope = [
             "https://www.googleapis.com/auth/spreadsheets",
             "https://www.googleapis.com/auth/drive",
@@ -32,12 +33,12 @@ class SheetsService:
             print(f"Failed to initialize Sheets Service: {e}")
             self.spreadsheet = None
 
-    def get_sheet(self, name):
+    def get_sheet(self, name: str) -> gspread.Worksheet | None:
         if not self.spreadsheet:
             return None
         return self.spreadsheet.worksheet(name)
 
-    def get_records_safe(self, name):
+    def get_records_safe(self, name: str) -> list[dict[str, Any]]:
         """Safely fetches all records from a worksheet."""
         sheet = self.get_sheet(name)
         if not sheet:
@@ -47,7 +48,7 @@ class SheetsService:
         except Exception:
             return []
 
-    def append_row(self, sheet_name, data):
+    def append_row(self, sheet_name: str, data: list[Any]) -> bool:
         sheet = self.get_sheet(sheet_name)
         if sheet:
             try:
@@ -68,7 +69,7 @@ class SheetsService:
                 return False
         return False
 
-    def get_vehicle_last_odo(self, vehicle_id):
+    def get_vehicle_last_odo(self, vehicle_id: str) -> Any:
         """Fetches the last recorded odometer for a vehicle from Master_Vehicles"""
         sheet = self.get_sheet("Master_Vehicles")
         if not sheet:
@@ -80,7 +81,7 @@ class SheetsService:
                 return record.get("Last_Odometer", 0)
         return 0
 
-    def get_all_vehicles(self):
+    def get_all_vehicles(self) -> list[dict[str, str]]:
         """Returns a list of all vehicle data (ID and License Plate)"""
         sheet = self.get_sheet("Master_Vehicles")
         if not sheet:
@@ -91,7 +92,7 @@ class SheetsService:
             {"id": str(v.get("VehicleID")), "plate": str(v.get("LicensePlate"))} for v in records if v.get("VehicleID")
         ]
 
-    def update_vehicle_status(self, vehicle_id, odo, status="Idle"):
+    def update_vehicle_status(self, vehicle_id: str, odo: Any, status: str = "Idle") -> None:
         """Updates the status and odo of a vehicle in Master_Vehicles"""
         sheet = self.get_sheet("Master_Vehicles")
         if not sheet:
@@ -165,8 +166,11 @@ class SheetsService:
         trip_list = []
 
         for r in records:
-            # Match date and driver
-            if (r.get("Date") == today or r.get("date") == today) and str(r.get("DriverID")) == str(driver_id):
+            # Match date and driver (Case-insensitive keys)
+            r_date = r.get("Date") or r.get("date") or r.get("DATE")
+            r_driver = r.get("DriverID") or r.get("driver_id") or r.get("Driver_ID") or r.get("driverid")
+
+            if str(r_date) == today and str(r_driver) == str(driver_id):
                 trips += 1
                 try:
                     d = float(r.get("Distance") or r.get("distance") or 0)
