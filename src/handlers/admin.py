@@ -1,7 +1,7 @@
 import os
 from datetime import datetime
 
-from telegram import Update
+from telegram import InputMediaPhoto, Update
 from telegram.ext import ContextTypes
 
 from handlers.base import BaseHandler
@@ -28,11 +28,12 @@ class AdminHandler(BaseHandler):
             "• /viewdaily - Today's operations\n"
             "• /viewweekly - Last 7 days summary\n"
             "• /viewfuel - Fuel efficiency stats\n"
-            "• /viewdrivers - Active driver list\n\n"
-            "📸 *Media Downloads*\n"
-            "• /downloadtoday - Today's trip photos\n"
-            "• /downloadweekly - This week's photos\n"
-            "• /downloadrange - Select Start & End dates\n"
+            "• /viewdrivers - Active driver list\n"
+            "• /live - Live fleet status 📺\n\n"
+            "📸 *Media Center*\n"
+            "• /gallery - Recent trip photos 🖼️\n"
+            "• /downloadtoday - ZIP of today's photos\n"
+            "• /downloadrange - Custom date ZIP\n"
             "• /downloadphotos <YYYY-MM-DD>\n\n"
             "💡 _Tip: Tapping the Admin button resets stuck states._"
         )
@@ -93,17 +94,60 @@ class AdminHandler(BaseHandler):
 
         await update.effective_message.reply_text(text, parse_mode="Markdown")
 
+    async def view_live_status(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
+        if not self._is_admin(update.effective_user.id):
+            return
+
+        vehicles = self.sheets.get_records_safe("Master_Vehicles")
+        if not vehicles:
+            await update.effective_message.reply_text("📺 No vehicle data.")
+            return
+
+        text = "📺 *Live Fleet Status*\n━━━━━━━━━━━━━━━━━━━━\n\n"
+        for v in vehicles:
+            status_icon = "🟢" if v.get("Status") == "On Trip" else "🟡"
+            text += f"{status_icon} *{v.get('LicensePlate')}*\n   └ Status: `{v.get('Status')}`\n   └ Last Odo: `{v.get('Last_Odometer')}`\n\n"
+
+        await update.effective_message.reply_text(text, parse_mode="Markdown")
+
+    async def view_recent_gallery(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
+        if not self._is_admin(update.effective_user.id):
+            return
+
+        await update.effective_message.reply_text("🖼️ Fetching recent trip photos...")
+
+        today = datetime.now().strftime("%Y-%m-%d")
+        prefix = f"trips/{today}/"
+
+        # List files in R2
+        response = self.drive.s3_client.list_objects_v2(Bucket=self.drive.bucket_name, Prefix=prefix, MaxKeys=5)
+
+        if "Contents" not in response:
+            await update.effective_message.reply_text("❌ No photos found for today yet.")
+            return
+
+        media_group = []
+        for obj in response["Contents"]:
+            key = obj["Key"]
+            # We use the public URL if available, otherwise we'd need to download and send
+            # For this implementation, let's assume we can generate a temporary URL or similar
+            # Since we have the binary data, let's just send the last 3-5 images
+            file_data = self.drive.s3_client.get_object(Bucket=self.drive.bucket_name, Key=key)["Body"].read()
+            media_group.append(InputMediaPhoto(file_data, caption=key.split("/")[-1]))
+
+        if media_group:
+            await update.effective_message.reply_media_group(media_group[:5])
+        else:
+            await update.effective_message.reply_text("❌ No viewable photos found.")
+
     async def download_today(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
         today = datetime.now().strftime("%Y-%m-%d")
         context.args = [today]
         await self.download_photos(update, context)
 
     async def download_weekly(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
-        # Weekly ZIPs are large, so we just ZIP the 'trips/' folder directly
-        # but for simplicity we'll just use the last 7 days prefix if needed
-        # In R2, we'll just download the whole trips/ folder or similar
         await update.effective_message.reply_text("📦 Fetching weekly photo archive...")
-        prefix = "trips/"  # Download all trips
+        prefix = "trips/"
         zip_buffer = self.drive.generate_period_zip(prefix)
         if zip_buffer:
             await update.effective_message.reply_document(
@@ -111,48 +155,6 @@ class AdminHandler(BaseHandler):
             )
         else:
             await update.effective_message.reply_text("❌ No photos found in the archive.")
-
-    async def start_download_range(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
-        if not self._is_admin(update.effective_user.id):
-            return
-        from core.states import ADMIN_DL_FROM
-
-        await update.effective_message.reply_text(
-            "📅 *Custom Range Download*\n\nPlease enter the **START DATE** (YYYY-MM-DD):", parse_mode="Markdown"
-        )
-        return ADMIN_DL_FROM
-
-    async def handle_from_date(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
-        from core.states import ADMIN_DL_TO
-
-        context.user_data["dl_from"] = update.message.text
-        await update.message.reply_text("Great! Now enter the **END DATE** (YYYY-MM-DD):", parse_mode="Markdown")
-        return ADMIN_DL_TO
-
-    async def handle_to_date(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
-        from telegram.ext import ConversationHandler
-
-        start_date = context.user_data.get("dl_from")
-        end_date = update.message.text
-
-        await update.message.reply_text(
-            f"📦 Generating ZIP from `{start_date}` to `{end_date}`... this may take a minute.", parse_mode="Markdown"
-        )
-
-        zip_buffer = self.drive.generate_range_zip(start_date, end_date)
-
-        if zip_buffer:
-            await update.message.reply_document(
-                document=zip_buffer,
-                filename=f"Fleet_Range_{start_date}_to_{end_date}.zip",
-                caption=f"📁 Archive: {start_date} to {end_date}",
-            )
-        else:
-            await update.message.reply_text(
-                f"❌ No photos found between `{start_date}` and `{end_date}`.", parse_mode="Markdown"
-            )
-
-        return ConversationHandler.END
 
     async def download_photos(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
         if not self._is_admin(update.effective_user.id):

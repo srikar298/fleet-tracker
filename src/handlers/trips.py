@@ -237,11 +237,22 @@ class TripHandler(BaseHandler):
     async def handle_end_odo(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
         try:
             odo = float(update.message.text)  # type: ignore
+            start_odo = float(context.user_data.get("start_odo", 0))
+
+            # Odometer Validation
+            if odo < start_odo:
+                await update.message.reply_text(
+                    f"⚠️ **Error**: End Odometer (`{odo}`) cannot be less than Start Odometer (`{start_odo}`).\n"
+                    "Please check the reading and enter it again:",
+                    parse_mode="Markdown",
+                )
+                return END_TRIP_ODO
+
             context.user_data["end_odo"] = odo  # type: ignore
             await update.message.reply_text("Upload a PHOTO of the end odometer:")  # type: ignore
             return END_TRIP_IMAGE
         except ValueError:
-            await update.message.reply_text("Invalid number.")  # type: ignore
+            await update.message.reply_text("Invalid number. Please enter digits only.")  # type: ignore
             return END_TRIP_ODO
 
     async def handle_end_image(self, update: Update, context: ContextTypes.DEFAULT_TYPE):

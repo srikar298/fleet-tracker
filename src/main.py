@@ -93,8 +93,8 @@ class FleetBot:
             BotCommand("start", "🚀 Main Menu"),
             BotCommand("admin", "👨‍✈️ Admin Center"),
             BotCommand("viewdaily", "📊 Today's Stats"),
-            BotCommand("viewdrivers", "👥 Driver List"),
-            BotCommand("downloadtoday", "📦 Download Today's Photos"),
+            BotCommand("live", "📺 Live Fleet Watch"),
+            BotCommand("gallery", "🖼️ Recent Photo Gallery"),
             BotCommand("cancel", "❌ Cancel Current Action"),
         ]
         await application.bot.set_my_commands(commands)
@@ -269,8 +269,11 @@ class FleetBot:
         application.add_handler(CommandHandler("viewweekly", self.admin_handler.view_daily_stats))
         application.add_handler(CommandHandler("viewfuel", self.admin_handler.view_fuel_stats))
         application.add_handler(CommandHandler("viewdrivers", self.admin_handler.view_drivers))
+        application.add_handler(CommandHandler("live", self.admin_handler.view_live_status))
+        application.add_handler(CommandHandler("gallery", self.admin_handler.view_recent_gallery))
         application.add_handler(CommandHandler("downloadtoday", self.admin_handler.download_today))
         application.add_handler(CommandHandler("downloadweekly", self.admin_handler.download_weekly))
+        application.add_handler(CommandHandler("downloadrange", self.admin_handler.start_download_range))
         application.add_handler(CommandHandler("downloadphotos", self.admin_handler.download_photos))
 
         application.add_handler(conv_handler)
