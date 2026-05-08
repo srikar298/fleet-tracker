@@ -336,6 +336,18 @@ class SheetsService:
 
         return sorted(report, key=lambda x: x["kml"], reverse=True)
 
+    def update_driver_salary(self, driver_id: str | int, amount: float) -> bool:
+        """Updates the base salary for a driver in Master_Drivers."""
+        ws = self.get_sheet("Master_Drivers")
+        if not ws:
+            return False
+        records = ws.get_all_records()
+        for i, r in enumerate(records, start=2):
+            if str(r.get("DriverID")) == str(driver_id):
+                ws.update_cell(i, 6, amount) # Column 6 is Base_Salary
+                return True
+        return False
+
     def get_driver_financial_summary(self, driver_id: str | int) -> dict[str, Any]:
         """Fetches today's earnings and monthly running total for a driver."""
         today = datetime.now().strftime("%Y-%m-%d")
@@ -346,7 +358,16 @@ class SheetsService:
         
         today_earnings = 0.0
         monthly_total = 0.0
+        base_salary = 27000.0 # Fallback
         
+        # Get driver info for base salary
+        d_info = self.get_driver_by_id(int(driver_id))
+        if d_info and d_info.get("Base_Salary"):
+            try:
+                base_salary = float(d_info["Base_Salary"])
+            except (ValueError, TypeError):
+                pass
+
         if att_ws:
             recs = att_ws.get_all_records()
             for r in recs:
@@ -364,5 +385,5 @@ class SheetsService:
         return {
             "today": round(today_earnings, 2),
             "monthly": round(monthly_total, 2),
-            "base": 27000.0
+            "base": base_salary
         }

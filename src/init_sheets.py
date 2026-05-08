@@ -17,7 +17,7 @@ def init() -> None:
     sheets_to_create = {
         "Dashboard": ["Metric", "Value", "Unit"],
         "Master_Vehicles": ["VehicleID", "LicensePlate", "ClientID", "Last_Odometer", "Status"],
-        "Master_Drivers": ["DriverID", "Name", "License", "ClientID", "Phone", "Status"],
+        "Master_Drivers": ["DriverID", "Name", "License", "ClientID", "Phone", "Base_Salary", "Status"],
         "Master_Clients": ["ClientID", "Client_Name", "Contract_Type", "Client_Billed_Per_Trip", "Driver_Payout_Per_Trip"],
         "Trips": [
             "TripID", "Date", "Client_Name", "ClientID", "VehicleID", "DriverID", 

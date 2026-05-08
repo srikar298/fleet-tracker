@@ -97,8 +97,16 @@ class AttendanceService:
                 sheet.update_cell(i, 10, achieved)
                 
                 # 3. Calculate Daily Earnings
-                # Fixed Salary: 27000 / 26 days = 1038.5 per day
-                daily_base = 1038.5
+                # Fetch dynamic base salary
+                driver_info = self.sheets.get_driver_by_id(driver_id)
+                base_salary = 27000.0
+                if driver_info and driver_info.get("Base_Salary"):
+                    try:
+                        base_salary = float(driver_info["Base_Salary"])
+                    except (ValueError, TypeError):
+                        pass
+
+                daily_base = base_salary / 26.0
                 incentive_per_trip = 100.0 # Extra money for trips > target
                 
                 earnings = daily_base
@@ -143,6 +151,17 @@ class AttendanceService:
                         total_shortfall += (daily_base - e)
 
         # 2. Update or Create Row in Monthly_Payroll
+        # Fetch dynamic base salary
+        driver_info = self.sheets.get_driver_by_id(driver_id)
+        base_salary = 27000.0
+        if driver_info and driver_info.get("Base_Salary"):
+            try:
+                base_salary = float(driver_info["Base_Salary"])
+            except (ValueError, TypeError):
+                pass
+        
+        daily_base = base_salary / 26.0
+        
         p_records = payroll_ws.get_all_records()
         row_idx = -1
         for i, pr in enumerate(p_records, start=2):
@@ -150,10 +169,9 @@ class AttendanceService:
                 row_idx = i
                 break
         
-        base_salary = 27000.0
         working_days = 26
         # Net Payout = (Base / 26 * Present) + Bonus - Shortfall
-        net_payout = (base_salary / working_days * present_days) + total_extra_bonus - total_shortfall
+        net_payout = (daily_base * present_days) + total_extra_bonus - total_shortfall
 
         row_data = [
             month_str,

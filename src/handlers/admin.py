@@ -390,3 +390,29 @@ class AdminHandler(BaseHandler):
             await update.message.reply_text("❌ Failed to generate payroll. Check Attendance records.")
             
         return None
+
+    async def set_salary_cmd(self, update: Update, context: ContextTypes.DEFAULT_TYPE) -> Any:
+        if not update.message or not update.message.text:
+            return None
+        
+        parts = update.message.text.split()
+        if len(parts) < 3:
+            await update.message.reply_text(
+                "⚠️ Usage: `/setsalary <DriverID> <Amount>`\n"
+                "Example: `/setsalary 12345678 28000`",
+                parse_mode="Markdown"
+            )
+            return None
+            
+        d_id = parts[1]
+        try:
+            amount = float(parts[2])
+            success = self.sheets.update_driver_salary(d_id, amount)
+            if success:
+                await update.message.reply_text(f"✅ Monthly base salary for Driver `{d_id}` set to **₹{amount}**.", parse_mode="Markdown")
+            else:
+                await update.message.reply_text(f"❌ Driver `{d_id}` not found in Master_Drivers.")
+        except ValueError:
+            await update.message.reply_text("❌ Salary amount must be a number.")
+            
+        return None
