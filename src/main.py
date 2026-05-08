@@ -77,6 +77,11 @@ class FleetBot:
         self.scheduler = AsyncIOScheduler()
         self.scheduler.add_job(self.backup.run_daily_backup, "cron", hour=0, minute=0)
 
+    async def post_init(self, application: Application) -> None:
+        """Starts the scheduler after the event loop is running."""
+        self.scheduler.start()
+        logger.info("Scheduler started successfully in post_init.")
+
     async def start(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
         await update.message.reply_text(  # type: ignore
             "Welcome to FleetTracker! 🚛\nUse the menu below to navigate.",
@@ -114,7 +119,7 @@ class FleetBot:
         return ConversationHandler.END
 
     def run(self):
-        application = Application.builder().token(self.token).build()
+        application = Application.builder().token(self.token).post_init(self.post_init).build()
 
         conv_handler = ConversationHandler(
             entry_points=[
@@ -235,7 +240,6 @@ class FleetBot:
         application.add_handler(CommandHandler("view_fuel", self.admin_handler.view_fuel_stats))
         application.add_handler(CommandHandler("download_photos", self.admin_handler.download_photos))
 
-        self.scheduler.start()
         application.run_polling()
 
 
