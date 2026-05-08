@@ -107,6 +107,22 @@ class AdminHandler(BaseHandler):
         await update.message.reply_text(f"✅ Broadcast sent successfully to {count} drivers.")
         return ConversationHandler.END
 
+    async def view_fuel_stats(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
+        if not self._is_admin(update.effective_user.id):
+            return
+
+        report = self.sheets.get_fuel_efficiency_report()
+        if not report:
+            await update.effective_message.reply_text("⛽ No fuel data available yet.")
+            return
+
+        text = "⛽ *Fleet Fuel Efficiency (KM/L)*\n━━━━━━━━━━━━━━━━━━━━\n\n"
+        for v in report:
+            status = "🟢" if v["kml"] > 15 else "🟠" if v["kml"] > 10 else "🔴"
+            text += f"{status} *{v['id']}*: `{v['kml']:.2f} KM/L`\n   └ _Distance: {v['total_km']} km_\n\n"
+
+        await update.effective_message.reply_text(text, parse_mode="Markdown")
+
     async def view_daily_stats(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
         if not self._is_admin(update.effective_user.id):
             return
