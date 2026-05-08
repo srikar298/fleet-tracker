@@ -104,6 +104,14 @@ class SheetsService:
                 sheet.update_cell(i, 5, status)  # Status
                 return
 
+    def get_driver_by_id(self, telegram_id):
+        """Fetches driver details by Telegram ID."""
+        records = self.get_records_safe("Master_Drivers")
+        for r in records:
+            if str(r.get("TelegramID")) == str(telegram_id):
+                return r
+        return None
+
     def register_driver(self, driver_id, name, license, phone, vendor_id="V-MASTER"):
         """Registers a new driver in Master_Drivers"""
         return self.append_row("Master_Drivers", [driver_id, name, license, vendor_id, phone, "Active"])

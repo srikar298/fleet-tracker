@@ -13,7 +13,22 @@ from utils.ui import get_main_menu
 
 class RegistrationHandler(BaseHandler):
     async def register_cmd(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
-        await update.message.reply_text("Let's register you! What is your Full Name?")  # type: ignore
+        driver = self.sheets.get_driver_by_id(update.effective_user.id)
+
+        if driver:
+            text = (
+                f"👤 *Your Profile*\n\n"
+                f"*Name*: {driver.get('Name')}\n"
+                f"*Phone*: {driver.get('PhoneNumber')}\n"
+                f"*License*: {driver.get('LicenseNumber')}\n"
+                f"*Vendor*: {driver.get('VendorID')}\n"
+                f"*Status*: {driver.get('Status')}\n\n"
+                f"Your details are already registered!"
+            )
+            await update.message.reply_text(text, parse_mode="Markdown", reply_markup=get_main_menu())
+            return ConversationHandler.END
+
+        await update.message.reply_text("Let's register you! What is your Full Name?")
         return REGISTER_NAME
 
     async def handle_register_name(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
