@@ -245,17 +245,22 @@ class FleetBot:
             },
             fallbacks=[
                 CommandHandler("start", self.start),
+                CommandHandler("cancel", self.cancel),
                 MessageHandler(filters.Regex("^❌ Cancel$"), self.cancel),
+                CommandHandler("admin", self.admin_handler.admin_menu),
             ],
+            allow_reentry=True,
+            name="fleet_conv",
+            persistent=True,
         )
 
-        application.add_handler(conv_handler)
-
-        # Admin Commands
+        # Admin Commands (Priority)
         application.add_handler(CommandHandler("admin", self.admin_handler.admin_menu))
         application.add_handler(CommandHandler("view_daily", self.admin_handler.view_daily_stats))
         application.add_handler(CommandHandler("view_fuel", self.admin_handler.view_fuel_stats))
         application.add_handler(CommandHandler("download_photos", self.admin_handler.download_photos))
+
+        application.add_handler(conv_handler)
 
         application.run_polling()
 
