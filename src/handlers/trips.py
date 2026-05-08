@@ -56,9 +56,7 @@ class TripHandler(BaseHandler):
 
         return await self.prompt_vehicle_selection(update, context)
 
-    async def handle_target_type(
-        self, update: Update, context: ContextTypes.DEFAULT_TYPE
-    ):
+    async def handle_target_type(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
         query = update.callback_query
         await query.answer()  # type: ignore
         tgt_type = query.data.replace("tgt_", "")  # type: ignore
@@ -69,14 +67,15 @@ class TripHandler(BaseHandler):
         )
         return DAILY_TARGET_VALUE
 
-    async def handle_target_value(
-        self, update: Update, context: ContextTypes.DEFAULT_TYPE
-    ):
+    async def handle_target_value(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
         try:
             val = float(update.message.text)  # type: ignore
             tgt_type = context.user_data.get("target_type", "Trips")  # type: ignore
             self.attendance.set_daily_target(
-                update.effective_user.id, "V-MASTER", tgt_type, val  # type: ignore
+                update.effective_user.id,
+                "V-MASTER",
+                tgt_type,
+                val,  # type: ignore
             )
 
             await update.message.reply_text(  # type: ignore
@@ -87,30 +86,21 @@ class TripHandler(BaseHandler):
             await update.message.reply_text("Please enter a valid number.")  # type: ignore
             return DAILY_TARGET_VALUE
 
-    async def prompt_vehicle_selection(
-        self, update: Update, context: ContextTypes.DEFAULT_TYPE
-    ):
+    async def prompt_vehicle_selection(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
         vehicles = self.sheets.get_all_vehicles()
-        keyboard = [
-            [InlineKeyboardButton(v["plate"], callback_data=f"veh_{v['id']}")]
-            for v in vehicles
-        ]
+        keyboard = [[InlineKeyboardButton(v["plate"], callback_data=f"veh_{v['id']}")] for v in vehicles]
         keyboard.append([InlineKeyboardButton("❌ Cancel", callback_data="cancel")])
 
         text = "Select Vehicle:"
         if hasattr(update, "message") and update.message:
-            await update.message.reply_text(
-                text, reply_markup=InlineKeyboardMarkup(keyboard)
-            )
+            await update.message.reply_text(text, reply_markup=InlineKeyboardMarkup(keyboard))
         else:
             await update.callback_query.message.reply_text(  # type: ignore
                 text, reply_markup=InlineKeyboardMarkup(keyboard)
             )
         return START_TRIP_VEHICLE
 
-    async def handle_start_vehicle(
-        self, update: Update, context: ContextTypes.DEFAULT_TYPE
-    ):
+    async def handle_start_vehicle(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
         query = update.callback_query
         await query.answer()  # type: ignore
         if query.data == "cancel":  # type: ignore
@@ -127,10 +117,7 @@ class TripHandler(BaseHandler):
         )
         return START_TRIP_ODO
 
-
-    async def handle_start_odo(
-        self, update: Update, context: ContextTypes.DEFAULT_TYPE
-    ):
+    async def handle_start_odo(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
         try:
             odo = float(update.message.text)  # type: ignore
             context.user_data["start_odo"] = odo  # type: ignore
@@ -154,9 +141,7 @@ class TripHandler(BaseHandler):
             await update.message.reply_text("Invalid number. Please enter digits only.")  # type: ignore
             return START_TRIP_ODO
 
-    async def handle_start_image(
-        self, update: Update, context: ContextTypes.DEFAULT_TYPE
-    ):
+    async def handle_start_image(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
         photo_file = await update.message.photo[-1].get_file()  # type: ignore
         photo_bytes = await photo_file.download_as_bytearray()
 
@@ -168,9 +153,7 @@ class TripHandler(BaseHandler):
         await update.message.reply_text("Share your CURRENT LOCATION (📎 -> Location):")  # type: ignore
         return START_TRIP_LOC
 
-    async def handle_start_loc(
-        self, update: Update, context: ContextTypes.DEFAULT_TYPE
-    ):
+    async def handle_start_loc(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
         loc = update.message.location  # type: ignore
         if loc:
             context.user_data["start_location"] = (  # type: ignore
@@ -184,7 +167,9 @@ class TripHandler(BaseHandler):
 
         self.attendance.log_activity(update.effective_user.id, "V-MASTER")  # type: ignore
         self.sheets.update_vehicle_status(
-            context.user_data["vehicle_id"], context.user_data["start_odo"], "On Trip"  # type: ignore
+            context.user_data["vehicle_id"],
+            context.user_data["start_odo"],
+            "On Trip",  # type: ignore
         )
 
         await update.message.reply_text(  # type: ignore
@@ -203,10 +188,7 @@ class TripHandler(BaseHandler):
             and "vehicle_id" not in context.user_data  # type: ignore
         ):
             vehicles = self.sheets.get_all_vehicles()
-            keyboard = [
-                [InlineKeyboardButton(v["plate"], callback_data=f"veh_{v['id']}")]
-                for v in vehicles
-            ]
+            keyboard = [[InlineKeyboardButton(v["plate"], callback_data=f"veh_{v['id']}")] for v in vehicles]
             keyboard.append([InlineKeyboardButton("❌ Cancel", callback_data="cancel")])
             await update.message.reply_text(  # type: ignore
                 "Which vehicle are you ending the trip for?",
@@ -218,9 +200,7 @@ class TripHandler(BaseHandler):
         await update.message.reply_text(f"Ending trip for {v_id}. Enter END Odometer:")  # type: ignore
         return END_TRIP_ODO
 
-    async def handle_end_vehicle(
-        self, update: Update, context: ContextTypes.DEFAULT_TYPE
-    ):
+    async def handle_end_vehicle(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
         query = update.callback_query
         await query.answer()  # type: ignore
         if query.data == "cancel":  # type: ignore
@@ -243,9 +223,7 @@ class TripHandler(BaseHandler):
             await update.message.reply_text("Invalid number.")  # type: ignore
             return END_TRIP_ODO
 
-    async def handle_end_image(
-        self, update: Update, context: ContextTypes.DEFAULT_TYPE
-    ):
+    async def handle_end_image(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
         photo_file = await update.message.photo[-1].get_file()  # type: ignore
         photo_bytes = await photo_file.download_as_bytearray()
 
@@ -280,9 +258,7 @@ class TripHandler(BaseHandler):
         )
         return FUEL_PROMPT
 
-    async def handle_fuel_prompt(
-        self, update: Update, context: ContextTypes.DEFAULT_TYPE
-    ):
+    async def handle_fuel_prompt(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
         query = update.callback_query
         await query.answer()  # type: ignore
         if query.data == "fuel_yes":  # type: ignore
@@ -294,9 +270,7 @@ class TripHandler(BaseHandler):
             await query.edit_message_text("Enter Total Revenue for this trip (in ₹):")  # type: ignore
             return END_TRIP_REVENUE
 
-    async def handle_fuel_data(
-        self, update: Update, context: ContextTypes.DEFAULT_TYPE
-    ):
+    async def handle_fuel_data(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
         data = update.message.text.split(",")  # type: ignore
         liters = data[0].strip()
         cost = data[1].strip() if len(data) > 1 else "0"
@@ -327,9 +301,7 @@ class TripHandler(BaseHandler):
         await update.message.reply_text("Upload a photo of the FUEL RECEIPT:")  # type: ignore
         return FUEL_IMAGE
 
-    async def handle_fuel_image(
-        self, update: Update, context: ContextTypes.DEFAULT_TYPE
-    ):
+    async def handle_fuel_image(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
         photo_file = await update.message.photo[-1].get_file()  # type: ignore
         photo_bytes = await photo_file.download_as_bytearray()
 
@@ -347,9 +319,7 @@ class TripHandler(BaseHandler):
         await update.message.reply_text("Enter Total Revenue for this trip (in ₹):")  # type: ignore
         return END_TRIP_REVENUE
 
-    async def handle_end_revenue(
-        self, update: Update, context: ContextTypes.DEFAULT_TYPE
-    ):
+    async def handle_end_revenue(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
         try:
             context.user_data["revenue"] = float(update.message.text)  # type: ignore
             await update.message.reply_text(  # type: ignore
@@ -360,9 +330,7 @@ class TripHandler(BaseHandler):
             await update.message.reply_text("Invalid number. Try again:")  # type: ignore
             return END_TRIP_REVENUE
 
-    async def handle_end_other_exp(
-        self, update: Update, context: ContextTypes.DEFAULT_TYPE
-    ):
+    async def handle_end_other_exp(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
         try:
             other = float(update.message.text)  # type: ignore
             context.user_data["other_expenses"] = other  # type: ignore
@@ -377,9 +345,7 @@ class TripHandler(BaseHandler):
             await update.message.reply_text("Invalid number. Try again:")  # type: ignore
             return END_TRIP_OTHER_EXP
 
-    async def handle_end_expense_photo(
-        self, update: Update, context: ContextTypes.DEFAULT_TYPE
-    ):
+    async def handle_end_expense_photo(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
         photo_file = await update.message.photo[-1].get_file()  # type: ignore
         photo_bytes = await photo_file.download_as_bytearray()
 
@@ -392,9 +358,7 @@ class TripHandler(BaseHandler):
 
         return await self.show_end_summary(update, context)
 
-    async def show_end_summary(
-        self, update: Update, context: ContextTypes.DEFAULT_TYPE
-    ):
+    async def show_end_summary(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
         start = context.user_data.get("start_odo")  # type: ignore
         if start is None:
             start = self.sheets.get_vehicle_last_odo(
@@ -422,9 +386,7 @@ class TripHandler(BaseHandler):
             current_rev = summary_stats["revenue"] + revenue
 
             current_val = current_trips if target["type"] == "Trips" else current_rev
-            gamification_text = GamificationEngine.generate_progress_bar(
-                current_val, target["value"], target["type"]
-            )
+            gamification_text = GamificationEngine.generate_progress_bar(current_val, target["value"], target["type"])
 
         summary = (
             f"📊 *Trip Summary*\n"
@@ -459,9 +421,7 @@ class TripHandler(BaseHandler):
 
         return END_TRIP_SUMMARY
 
-    async def handle_end_summary(
-        self, update: Update, context: ContextTypes.DEFAULT_TYPE
-    ):
+    async def handle_end_summary(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
         query = update.callback_query
         await query.answer()  # type: ignore
         if query.data == "confirm":  # type: ignore
@@ -497,7 +457,9 @@ class TripHandler(BaseHandler):
             if flag_str != "OK":
                 flag_str = "🚩 " + flag_str
                 self.drive.flag_trip_images(
-                    date, update.effective_user.first_name, trip_id  # type: ignore
+                    date,
+                    update.effective_user.first_name,
+                    trip_id,  # type: ignore
                 )
 
             trip_record = {
