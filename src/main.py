@@ -16,6 +16,7 @@ from telegram.ext import (
 )
 
 from core.states import (
+    ADMIN_BROADCAST,
     ADMIN_DL_FROM,
     ADMIN_DL_TO,
     END_TRIP_EXPENSE_PHOTO,
@@ -36,8 +37,6 @@ from core.states import (
     REPORT_DESC,
     REPORT_PHOTO,
     REPORT_VEHICLE,
-    START_TRIP_IMAGE,
-    START_TRIP_LOC,
     START_TRIP_ODO,
     START_TRIP_VEHICLE,
 )
@@ -164,6 +163,8 @@ class FleetBot:
                     self.inc_handler.report_damage_cmd,
                 ),
                 CommandHandler("downloadrange", self.admin_handler.start_download_range),
+                CommandHandler("broadcast", self.admin_handler.start_broadcast),
+                CommandHandler("health", self.admin_handler.health_check),
                 MessageHandler(filters.Regex("^❌ Cancel$"), self.cancel),
             ],
             states={
@@ -251,6 +252,8 @@ class FleetBot:
                 # Admin Download Range
                 ADMIN_DL_FROM: [MessageHandler(filters.TEXT & ~filters.COMMAND, self.admin_handler.handle_from_date)],
                 ADMIN_DL_TO: [MessageHandler(filters.TEXT & ~filters.COMMAND, self.admin_handler.handle_to_date)],
+                # Admin Broadcast
+                ADMIN_BROADCAST: [MessageHandler(filters.TEXT & ~filters.COMMAND, self.admin_handler.handle_broadcast)],
             },
             fallbacks=[
                 CommandHandler("start", self.start),
@@ -275,6 +278,13 @@ class FleetBot:
         application.add_handler(CommandHandler("downloadweekly", self.admin_handler.download_weekly))
         application.add_handler(CommandHandler("downloadrange", self.admin_handler.start_download_range))
         application.add_handler(CommandHandler("downloadphotos", self.admin_handler.download_photos))
+
+        # Admin Callbacks (Generic)
+        application.add_handler(
+            CallbackQueryHandler(
+                self.admin_handler.handle_admin_callback, pattern="^(refresh_|drv_|back_|approve_|reject_)"
+            )
+        )
 
         application.add_handler(conv_handler)
 

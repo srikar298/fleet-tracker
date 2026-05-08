@@ -401,9 +401,37 @@ class TripHandler(BaseHandler):
         driver_name = update.effective_user.first_name  # type: ignore
         v_id = context.user_data.get("vehicle_id", "Unknown")  # type: ignore
         cost = context.user_data.get("other_expenses", 0)  # type: ignore
+        trip_id = context.user_data.get("trip_id", "Unknown")  # type: ignore
 
         url = self.drive.save_expense_receipt(photo_bytes, driver_name, v_id, cost)
         context.user_data["expense_image_url"] = url  # type: ignore
+
+        # Alert Admins for Approval
+        admin_ids = [int(i.strip()) for i in os.getenv("ADMIN_IDS", "").split(",") if i.strip()]
+        for admin_id in admin_ids:
+            try:
+                keyboard = [
+                    [
+                        InlineKeyboardButton("✅ Approve", callback_data=f"approve_{trip_id}"),
+                        InlineKeyboardButton("❌ Reject", callback_data=f"reject_{trip_id}"),
+                    ]
+                ]
+                await context.bot.send_photo(
+                    chat_id=admin_id,
+                    photo=photo_bytes,
+                    caption=(
+                        f"💰 *New Expense for Approval*\n"
+                        f"━━━━━━━━━━━━━━━━━━━━\n"
+                        f"👤 Driver: {driver_name}\n"
+                        f"🚗 Vehicle: {v_id}\n"
+                        f"💵 Amount: ₹{cost}\n"
+                        f"📅 Date: {datetime.now().strftime('%Y-%m-%d')}"
+                    ),
+                    parse_mode="Markdown",
+                    reply_markup=InlineKeyboardMarkup(keyboard),
+                )
+            except Exception as e:
+                logger.error(f"Failed to notify admin {admin_id} for approval: {e}")
 
         return await self.show_end_summary(update, context)
 

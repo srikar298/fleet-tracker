@@ -26,4 +26,5 @@
     REPORT_PHOTO,
     ADMIN_DL_FROM,
     ADMIN_DL_TO,
-) = range(27)
+    ADMIN_BROADCAST,
+) = range(28)
