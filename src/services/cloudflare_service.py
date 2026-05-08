@@ -27,6 +27,7 @@ class CloudflareR2Service:
             endpoint_url=self.endpoint_url,
             aws_access_key_id=self.access_key,
             aws_secret_access_key=self.secret_key,
+            region_name="auto",  # Cloudflare R2 requires "auto" region
             config=Config(signature_version="s3v4"),
         )
 
