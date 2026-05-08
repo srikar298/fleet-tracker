@@ -75,12 +75,12 @@ class FleetBot:
         self.admin_handler = AdminHandler(self.sheets, self.drive, self.attendance)
         self.backup = BackupService(self.sheets, self.drive)
 
-    def is_admin(self, user_id):
-        return user_id in self.admin_ids
-
         # Initialize Scheduler for Backups
         self.scheduler = AsyncIOScheduler()
         self.scheduler.add_job(self.backup.run_daily_backup, "cron", hour=0, minute=0)
+
+    def is_admin(self, user_id):
+        return user_id in self.admin_ids
 
     async def post_init(self, application: Application) -> None:
         """Starts the scheduler after the event loop is running."""
