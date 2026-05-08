@@ -16,94 +16,45 @@ def init() -> None:
 
     sheets_to_create = {
         "Dashboard": ["Metric", "Value", "Unit"],
-        "Master_Vehicles": [
-            "VehicleID",
-            "LicensePlate",
-            "VendorID",
-            "Last_Odometer",
-            "Status",
-        ],
-        "Master_Drivers": [
-            "DriverID",
-            "Name",
-            "License",
-            "VendorID",
-            "Phone",
-            "Status",
-        ],
+        "Master_Vehicles": ["VehicleID", "LicensePlate", "VendorID", "Last_Odometer", "Status"],
+        "Master_Drivers": ["DriverID", "Name", "License", "VendorID", "Phone", "Status"],
+        "Master_Vendors": ["VendorID", "Vendor_Name", "Default_Client", "Client_Billed_Per_Trip", "Driver_Payout_Per_Trip"],
         "Trips": [
-            "TripID",
-            "Date",
-            "VendorID",
-            "DriverID",
-            "VehicleID",
-            "Start_Time",
-            "End_Time",
-            "Duration_Mins",
-            "Start_Location",
-            "End_Location",
-            "Start_Odometer",
-            "End_Odometer",
-            "Distance",
-            "Fuel_Liters",
-            "Fuel_Cost",
-            "Other_Expenses",
-            "Revenue",
-            "Net_Profit",
-            "Driver_Score",
-            "Start_Image",
-            "End_Image",
-            "Receipt_Image",
-            "Flag",
-            "Remarks",
+            "TripID", "Date", "Client_Name", "VendorID", "DriverID", "VehicleID", 
+            "Start_Time", "End_Time", "Duration_Mins", "Start_Location", "End_Location", 
+            "Start_Odometer", "End_Odometer", "Distance", "Fuel_Liters", "Fuel_Cost", 
+            "Other_Expenses", "Client_Billed_Amount", "Driver_Payout_Amount", "Gross_Margin", 
+            "Driver_Score", "Start_Image", "End_Image", "Receipt_Image", "Flag", "Remarks"
         ],
-        "Attendance": [
-            "Date",
-            "DriverID",
-            "VendorID",
-            "First_CheckIn",
-            "Last_Activity",
-            "Status",
-            "Target_Type",
-            "Target_Value",
-        ],
-        "Daily_Summary": [
-            "Date",
-            "VehicleID",
-            "DriverID",
-            "TripsCount",
-            "TotalKM",
-            "TotalFuelCost",
-            "TotalOtherExpenses",
-            "TotalRevenue",
-            "NetProfit",
-            "FlagsCount",
-            "DriverScoreAvg",
-            "Status",
-        ],
+        "Attendance": ["Date", "DriverID", "VendorID", "First_CheckIn", "Last_Activity", "Status", "Target_Type", "Target_Value"],
+        "Daily_Summary": ["Date", "VehicleID", "DriverID", "TripsCount", "TotalKM", "TotalFuelCost", "TotalOtherExpenses", "TotalBilled", "TotalPayout", "NetMargin", "FlagsCount", "DriverScoreAvg", "Status"],
     }
 
     for name, headers in sheets_to_create.items():
         try:
-            # Try to get or create
-            try:
+            # Check if worksheet exists
+            worksheet_list = [w.title for w in service.spreadsheet.worksheets()]
+            
+            if name in worksheet_list:
                 ws = service.spreadsheet.worksheet(name)
-                print(f"✅ Sheet '{name}' already exists.")
-            except Exception:
-                ws = service.spreadsheet.add_worksheet(title=name, rows="1000", cols="20")
-                print(f"🆕 Created sheet '{name}'.")
+                print(f"Sheet '{name}' verified.")
+            else:
+                ws = service.spreadsheet.add_worksheet(title=name, rows="1000", cols="26")
+                print(f"Created new sheet: {name}")
 
-            # Set headers if empty
-            if not ws.row_values(1):
+            # Check for headers
+            current_headers = ws.row_values(1)
+            if not current_headers:
                 ws.insert_row(headers, 1)
-                print(f"📝 Added headers to '{name}'.")
+                print(f"Initialized headers for {name}")
+            elif len(current_headers) != len(headers):
+                print(f"Warning: {name} headers mismatch. Current: {len(current_headers)}, Expected: {len(headers)}")
 
-            # Specific logic for Dashboard
             if name == "Dashboard":
                 setup_dashboard(ws)
 
         except Exception as e:
-            print(f"⚠️ Error with sheet '{name}': {e}")
+            print(f"Error handling sheet {name}: {str(e)}")
 
 
 def setup_dashboard(ws: Any) -> None:

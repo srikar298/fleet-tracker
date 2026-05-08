@@ -118,6 +118,38 @@ class SheetsService:
                 return r
         return None
 
+    def get_vendor_rates(self, vendor_id: str) -> dict[str, Any]:
+        """Fetches pricing rates for a vendor."""
+        records = self.get_records_safe("Master_Vendors")
+        for r in records:
+            if str(r.get("VendorID")) == str(vendor_id):
+                return {
+                    "client_name": str(r.get("Default_Client", "General B2B")),
+                    "client_billed": float(r.get("Client_Billed_Per_Trip") or 0),
+                    "driver_payout": float(r.get("Driver_Payout_Per_Trip") or 0),
+                }
+        return {
+            "client_name": "General B2B",
+            "client_billed": 0,
+            "driver_payout": 0,
+        }
+
+    def add_vendor_rate(self, v_id: str, client: str, billed: float, payout: float) -> bool:
+        """Adds or updates a vendor's pricing rate in Master_Vendors."""
+        ws = self.get_sheet("Master_Vendors")
+        if not ws:
+            return False
+        
+        # Check if exists to update
+        records = ws.get_all_records()
+        for i, r in enumerate(records, 2):
+            if str(r.get("VendorID")) == str(v_id):
+                ws.update(f"A{i}:E{i}", [[v_id, v_id, client, billed, payout]])
+                return True
+        
+        # Otherwise append
+        return self.append_row("Master_Vendors", [v_id, v_id, client, billed, payout])
+
     def register_driver(self, driver_id: int, name: str, license: str, phone: str, vendor_id: str = "V-MASTER") -> bool:
         """Registers a new driver in Master_Drivers"""
         return self.append_row("Master_Drivers", [driver_id, name, license, vendor_id, phone, "Active"])

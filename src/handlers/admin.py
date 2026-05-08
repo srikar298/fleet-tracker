@@ -335,3 +335,38 @@ class AdminHandler(BaseHandler):
             await update.message.reply_text(f"❌ Failed to generate zip: {e}")
             
         return ConversationHandler.END
+
+    async def set_price_cmd(self, update: Update, context: ContextTypes.DEFAULT_TYPE) -> Any:
+        if not update.message or not update.message.text:
+            return None
+        
+        # Format: /setprice <VendorID> <ClientName> <Billed> <Payout>
+        parts = update.message.text.split()
+        if len(parts) < 5:
+            await update.message.reply_text(
+                "⚠️ Usage: `/setprice <VendorID> <Client_Name> <Billed> <Payout>`\n"
+                "Example: `/setprice V-001 Amazon 2500 1800`",
+                parse_mode="Markdown"
+            )
+            return None
+            
+        v_id = parts[1]
+        client = parts[2]
+        try:
+            billed = float(parts[3])
+            payout = float(parts[4])
+            
+            success = self.sheets.add_vendor_rate(v_id, client, billed, payout)
+            if success:
+                await update.message.reply_text(
+                    f"✅ Rates updated for **{v_id}** ({client})\n"
+                    f"💰 Billing: ₹{billed}\n"
+                    f"💸 Payout: ₹{payout}",
+                    parse_mode="Markdown"
+                )
+            else:
+                await update.message.reply_text("❌ Failed to update rates. Check Master_Vendors sheet.")
+        except ValueError:
+            await update.message.reply_text("❌ Billed and Payout must be numbers.")
+        
+        return None

@@ -326,8 +326,7 @@ class TripHandler(BaseHandler):
         else:
             context.user_data["fuel_liters"] = "0"
             context.user_data["fuel_cost"] = "0"
-            await query.edit_message_text("Enter Total Revenue for this trip (in ₹):")
-            return END_TRIP_REVENUE
+            return await self.show_end_summary(update, context)
 
     async def handle_fuel_data(self, update: Update, context: ContextTypes.DEFAULT_TYPE) -> Any:
         if not update.message or not update.message.text or context.user_data is None:
@@ -373,81 +372,8 @@ class TripHandler(BaseHandler):
         )
         context.user_data["fuel_image_url"] = url
 
-        await update.message.reply_text("Any other expenses? (Toll/Parking/Maintenance)\nEnter total amount (or 0):")
-        return END_TRIP_OTHER_EXP
-
-    async def handle_end_revenue(self, update: Update, context: ContextTypes.DEFAULT_TYPE) -> Any:
-        if not update.message or not update.message.text or context.user_data is None:
-            return None
-        try:
-            context.user_data["revenue"] = float(update.message.text)
-            await update.message.reply_text(
-                "Any other expenses? (Toll/Parking/Maintenance)\nEnter total amount (or 0):"
-            )
-            return END_TRIP_OTHER_EXP
-        except ValueError:
-            await update.message.reply_text("Invalid number. Try again:")
-            return END_TRIP_REVENUE
-
-    async def handle_end_other_exp(self, update: Update, context: ContextTypes.DEFAULT_TYPE) -> Any:
-        if not update.message or not update.message.text or context.user_data is None:
-            return None
-        try:
-            other = float(update.message.text)
-            context.user_data["other_expenses"] = other
-            if other > 0:
-                await update.message.reply_text(
-                    "Please upload a photo of the receipt for this expense (Toll/Maintenance):"
-                )
-                return END_TRIP_EXPENSE_PHOTO
-            else:
-                return await self.show_end_summary(update, context)
-        except ValueError:
-            await update.message.reply_text("Invalid number. Try again:")
-            return END_TRIP_OTHER_EXP
-
-    async def handle_end_expense_photo(self, update: Update, context: ContextTypes.DEFAULT_TYPE) -> Any:
-        if not update.message or not update.message.photo or not update.effective_user or context.user_data is None:
-            return None
-        photo_file = await update.message.photo[-1].get_file()
-        photo_bytes = await photo_file.download_as_bytearray()
-
-        driver_name = str(update.effective_user.first_name)
-        v_id = str(context.user_data.get("vehicle_id", "Unknown"))
-        cost = context.user_data.get("other_expenses", 0)
-        trip_id = str(context.user_data.get("trip_id", "Unknown"))
-
-        url = self.drive.save_expense_receipt(photo_bytes, driver_name, v_id, cost)
-        context.user_data["expense_image_url"] = url
-
-        # Alert Admins for Approval
-        admin_ids = [int(i.strip()) for i in os.getenv("ADMIN_IDS", "").split(",") if i.strip()]
-        for admin_id in admin_ids:
-            try:
-                keyboard: list[list[InlineKeyboardButton]] = [
-                    [
-                        InlineKeyboardButton("✅ Approve", callback_data=f"approve_{trip_id}"),
-                        InlineKeyboardButton("❌ Reject", callback_data=f"reject_{trip_id}"),
-                    ]
-                ]
-                await context.bot.send_photo(
-                    chat_id=admin_id,
-                    photo=photo_bytes,
-                    caption=(
-                        f"💰 *New Expense for Approval*\n"
-                        f"━━━━━━━━━━━━━━━━━━━━\n"
-                        f"👤 Driver: {driver_name}\n"
-                        f"🚗 Vehicle: {v_id}\n"
-                        f"💵 Amount: ₹{cost}\n"
-                        f"📅 Date: {datetime.now().strftime('%Y-%m-%d')}"
-                    ),
-                    parse_mode="Markdown",
-                    reply_markup=InlineKeyboardMarkup(keyboard),
-                )
-            except Exception as e:
-                logger.error(f"Failed to notify admin {admin_id} for approval: {e}")
-
         return await self.show_end_summary(update, context)
+
 
     async def show_end_summary(self, update: Update, context: ContextTypes.DEFAULT_TYPE) -> Any:
         if not update.effective_message or context.user_data is None:
@@ -535,11 +461,16 @@ class TripHandler(BaseHandler):
                     trip_id,
                 )
 
+            # Fetch B2B Rates from Master_Vendors
+            driver_info = self.sheets.get_driver_by_id(update.effective_user.id)
+            vendor_id = str(driver_info.get("VendorID", "V-MASTER")) if driver_info else "V-MASTER"
+            rates = self.sheets.get_vendor_rates(vendor_id)
+
             trip_record: dict[str, Any] = {
                 "trip_id": trip_id,
                 "date": date,
-                "client_name": context.user_data.get("client_name", "General B2B"),
-                "vendor_id": "V-MASTER",
+                "client_name": rates["client_name"],
+                "vendor_id": vendor_id,
                 "driver_id": update.effective_user.id,
                 "vehicle_id": context.user_data.get("vehicle_id", "Unknown"),
                 "start_time": start_time.strftime("%H:%M:%S"),
@@ -553,8 +484,8 @@ class TripHandler(BaseHandler):
                 "fuel_liters": context.user_data.get("fuel_liters", 0),
                 "fuel_cost": context.user_data.get("fuel_cost", 0),
                 "other_expenses": context.user_data.get("other_expenses", 0),
-                "client_billed": context.user_data.get("client_billed", 0),
-                "driver_payout": context.user_data.get("driver_payout", 0),
+                "client_billed": rates["client_billed"],
+                "driver_payout": rates["driver_payout"],
                 "net_profit": "=R{row}-S{row}", # Gross Margin = Billed - Payout
                 "driver_score": score,
                 "start_image": context.user_data.get("start_image_url"),

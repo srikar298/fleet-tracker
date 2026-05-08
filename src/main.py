@@ -250,19 +250,6 @@ class FleetBot:
                     )
                 ],
                 FUEL_IMAGE: [MessageHandler(filters.PHOTO, self.trip_handler.handle_fuel_image)],
-                END_TRIP_REVENUE: [
-                    MessageHandler(
-                        filters.TEXT & ~filters.COMMAND,
-                        self.trip_handler.handle_end_revenue,
-                    )
-                ],
-                END_TRIP_OTHER_EXP: [
-                    MessageHandler(
-                        filters.TEXT & ~filters.COMMAND,
-                        self.trip_handler.handle_end_other_exp,
-                    )
-                ],
-                END_TRIP_EXPENSE_PHOTO: [MessageHandler(filters.PHOTO, self.trip_handler.handle_end_expense_photo)],
                 END_TRIP_SUMMARY: [CallbackQueryHandler(self.trip_handler.handle_end_summary)],
                 # Admin Download Range
                 ADMIN_DL_FROM: [MessageHandler(filters.TEXT & ~filters.COMMAND, self.admin_handler.handle_from_date)],
@@ -293,6 +280,7 @@ class FleetBot:
         application.add_handler(CommandHandler("downloadweekly", self.admin_handler.download_weekly))
         application.add_handler(CommandHandler("downloadrange", self.admin_handler.start_download_range))
         application.add_handler(CommandHandler("downloadphotos", self.admin_handler.download_photos))
+        application.add_handler(CommandHandler("setprice", self.admin_handler.set_price_cmd))
 
         # Admin Callbacks (Generic)
         application.add_handler(
