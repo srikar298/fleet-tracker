@@ -81,41 +81,74 @@ class CloudflareR2Service:
 
     def save_kyc_document(self, file_content, driver_name):
         try:
+            # Compress before upload
+            compressed_content = self._compress_image(file_content)
+
             safe_name = "".join([c if c.isalnum() else "_" for c in driver_name])
             key = f"compliance/kyc/{safe_name}_license.jpg"
-            self.s3_client.put_object(Bucket=self.bucket_name, Key=key, Body=file_content, ContentType="image/jpeg")
+
+            self.s3_client.put_object(
+                Bucket=self.bucket_name, Key=key, Body=compressed_content, ContentType="image/jpeg"
+            )
+            logger.info(f"✅ Successfully uploaded KYC document for {driver_name}: {key}")
             return f"{self.public_url}/{key}" if self.public_url else key
-        except Exception:
+        except Exception as e:
+            logger.error(f"❌ Error uploading KYC: {e}")
             return None
 
     def save_fuel_receipt(self, file_content, driver_name, trip_id, vehicle_id, cost):
         try:
+            # Compress before upload
+            compressed_content = self._compress_image(file_content)
+
             date_str = datetime.now().strftime("%Y-%m-%d")
             key = f"finance/fuel/{date_str}_{vehicle_id}_Rs{cost}.jpg"
-            self.s3_client.put_object(Bucket=self.bucket_name, Key=key, Body=file_content, ContentType="image/jpeg")
-            # Also upload as part of the trip
+
+            self.s3_client.put_object(
+                Bucket=self.bucket_name, Key=key, Body=compressed_content, ContentType="image/jpeg"
+            )
+            # Also upload as part of the trip (this will also compress)
             self.upload_file(file_content, driver_name, trip_id, "fuel_receipt")
+
+            logger.info(f"✅ Successfully uploaded fuel receipt: {key}")
             return f"{self.public_url}/{key}" if self.public_url else key
-        except Exception:
+        except Exception as e:
+            logger.error(f"❌ Error uploading fuel receipt: {e}")
             return None
 
     def save_expense_receipt(self, file_content, driver_name, vehicle_id, expense_amount):
         try:
+            # Compress before upload
+            compressed_content = self._compress_image(file_content)
+
             date_str = datetime.now().strftime("%Y-%m-%d")
             safe_name = "".join([c if c.isalnum() else "_" for c in driver_name])
             key = f"finance/expenses/{date_str}_{safe_name}_{vehicle_id}_Rs{expense_amount}.jpg"
-            self.s3_client.put_object(Bucket=self.bucket_name, Key=key, Body=file_content, ContentType="image/jpeg")
+
+            self.s3_client.put_object(
+                Bucket=self.bucket_name, Key=key, Body=compressed_content, ContentType="image/jpeg"
+            )
+            logger.info(f"✅ Successfully uploaded expense receipt: {key}")
             return f"{self.public_url}/{key}" if self.public_url else key
-        except Exception:
+        except Exception as e:
+            logger.error(f"❌ Error uploading expense receipt: {e}")
             return None
 
     def save_incident_report(self, file_content, driver_name, vehicle_id):
         try:
+            # Compress before upload
+            compressed_content = self._compress_image(file_content)
+
             date_str = datetime.now().strftime("%Y-%m-%d_%H%M%S")
             key = f"incidents/{date_str}_{vehicle_id}_damage.jpg"
-            self.s3_client.put_object(Bucket=self.bucket_name, Key=key, Body=file_content, ContentType="image/jpeg")
+
+            self.s3_client.put_object(
+                Bucket=self.bucket_name, Key=key, Body=compressed_content, ContentType="image/jpeg"
+            )
+            logger.info(f"✅ Successfully uploaded incident report: {key}")
             return f"{self.public_url}/{key}" if self.public_url else key
-        except Exception:
+        except Exception as e:
+            logger.error(f"❌ Error uploading incident report: {e}")
             return None
 
     def generate_period_zip(self, prefix):
