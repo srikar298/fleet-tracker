@@ -375,7 +375,6 @@ class TripHandler(BaseHandler):
 
         end = context.user_data.get("end_odo", 0)  # type: ignore
         distance = end - float(start)
-        revenue = context.user_data.get("revenue", 0)  # type: ignore
         fuel = float(context.user_data.get("fuel_cost", 0))  # type: ignore
         other = context.user_data.get("other_expenses", 0)  # type: ignore
         total_expenses = fuel + other
