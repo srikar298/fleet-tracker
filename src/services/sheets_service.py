@@ -155,37 +155,36 @@ class SheetsService:
         return self.append_row("Master_Drivers", [driver_id, name, license, client_id, phone, "Active"])
 
     def record_trip(self, trip_data: dict[str, Any]) -> bool:
-        """Appends a final trip record to the Trips sheet matching B2B headers exactly"""
+        """Appends a final trip record to the Trips sheet matching Business First order"""
         return self.append_row(
             "Trips",
             [
-                trip_data.get("trip_id"),           # TripID
-                trip_data.get("date"),              # Date
-                trip_data.get("client_name", "N/A"),# Client_Name
-                trip_data.get("client_id"),         # ClientID
-                trip_data.get("driver_id"),         # DriverID
-                trip_data.get("vehicle_id"),        # VehicleID
-                trip_data.get("start_time"),        # Start_Time
-                trip_data.get("end_time"),          # End_Time
-                trip_data.get("duration"),          # Duration_Mins
-                trip_data.get("start_location"),    # Start_Location
-                trip_data.get("end_location"),      # End_Location
-                trip_data.get("start_odo"),         # Start_Odometer
-                trip_data.get("end_odo"),           # End_Odometer
-                trip_data.get("distance"),          # Distance
-                trip_data.get("fuel_liters"),       # Fuel_Liters
-                trip_data.get("fuel_cost"),         # Fuel_Cost
-                trip_data.get("other_expenses"),    # Other_Expenses
-                trip_data.get("client_billed", 0),  # Client_Billed_Amount
-                trip_data.get("driver_payout", 0),  # Driver_Payout_Amount
-                trip_data.get("net_profit"),        # Gross_Margin
-                "=IF(R{row}>0, T{row}/R{row}, 0)",  # Net_Margin_Percentage
-                trip_data.get("driver_score"),      # Driver_Score
-                trip_data.get("start_image"),       # Start_Image
-                trip_data.get("end_image"),         # End_Image
-                trip_data.get("fuel_image"),        # Receipt_Image
-                trip_data.get("flag"),              # Flag
-                trip_data.get("remarks"),           # Remarks
+                trip_data.get("trip_id"),           # A: TripID
+                trip_data.get("date"),              # B: Date
+                trip_data.get("client_name", "N/A"),# C: Client_Name
+                trip_data.get("client_id"),         # D: ClientID
+                trip_data.get("vehicle_id"),        # E: VehicleID
+                trip_data.get("driver_id"),         # F: DriverID
+                trip_data.get("distance"),          # G: Distance (KM)
+                trip_data.get("client_billed", 0),  # H: Client_Billed_Amount
+                trip_data.get("driver_payout", 0),  # I: Driver_Payout_Amount
+                trip_data.get("fuel_cost", 0),      # J: Fuel_Cost
+                trip_data.get("other_expenses", 0), # K: Other_Expenses
+                "=H{row}-I{row}-J{row}-K{row}",    # L: Gross_Margin
+                "=IF(H{row}>0, L{row}/H{row}, 0)",  # M: Net_Margin_Percentage
+                trip_data.get("driver_score"),      # N: Driver_Score
+                trip_data.get("flag"),              # O: Flag
+                trip_data.get("remarks"),           # P: Remarks
+                trip_data.get("start_time"),        # Q: Start_Time
+                trip_data.get("end_time"),          # R: End_Time
+                trip_data.get("start_odo"),         # S: Start_Odometer
+                trip_data.get("end_odo"),           # T: End_Odometer
+                trip_data.get("fuel_liters"),       # U: Fuel_Liters
+                trip_data.get("start_image"),       # V: Start_Image
+                trip_data.get("end_image"),         # W: End_Image
+                trip_data.get("fuel_image"),        # X: Receipt_Image
+                trip_data.get("start_location"),    # Y: Start_Location
+                trip_data.get("end_location"),      # Z: End_Location
             ],
         )
 

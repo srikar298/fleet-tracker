@@ -20,11 +20,11 @@ def init() -> None:
         "Master_Drivers": ["DriverID", "Name", "License", "ClientID", "Phone", "Status"],
         "Master_Clients": ["ClientID", "Client_Name", "Contract_Type", "Client_Billed_Per_Trip", "Driver_Payout_Per_Trip"],
         "Trips": [
-            "TripID", "Date", "Client_Name", "ClientID", "DriverID", "VehicleID", 
-            "Start_Time", "End_Time", "Duration_Mins", "Start_Location", "End_Location", 
-            "Start_Odometer", "End_Odometer", "Distance", "Fuel_Liters", "Fuel_Cost", 
-            "Other_Expenses", "Client_Billed_Amount", "Driver_Payout_Amount", "Gross_Margin", 
-            "Net_Margin_Percentage", "Driver_Score", "Start_Image", "End_Image", "Receipt_Image", "Flag", "Remarks"
+            "TripID", "Date", "Client_Name", "ClientID", "VehicleID", "DriverID", 
+            "Distance", "Client_Billed_Amount", "Driver_Payout_Amount", "Fuel_Cost", 
+            "Other_Expenses", "Gross_Margin", "Net_Margin_Percentage", "Driver_Score", 
+            "Flag", "Remarks", "Start_Time", "End_Time", "Start_Odometer", "End_Odometer", 
+            "Fuel_Liters", "Start_Image", "End_Image", "Receipt_Image", "Start_Location", "End_Location"
         ],
         "Attendance": ["Date", "DriverID", "ClientID", "First_CheckIn", "Last_Activity", "Status", "Target_Type", "Target_Value"],
         "Daily_Summary": ["Date", "VehicleID", "DriverID", "TripsCount", "TotalKM", "TotalFuelCost", "TotalOtherExpenses", "TotalBilled", "TotalPayout", "NetMargin", "FlagsCount", "DriverScoreAvg", "Status"],
