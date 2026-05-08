@@ -93,8 +93,13 @@ class TripHandler(BaseHandler):
         keyboard.append([InlineKeyboardButton("❌ Cancel", callback_data="cancel")])
 
         text = "Select Vehicle:"
+        is_admin = self.is_admin(update.effective_user.id)
+        reply_markup = get_main_menu(is_admin)
+
         if hasattr(update, "message") and update.message:
             await update.message.reply_text(text, reply_markup=InlineKeyboardMarkup(keyboard))
+            # Refresh the reply keyboard too
+            await update.message.reply_text("Trip controls active:", reply_markup=reply_markup)
         else:
             await update.callback_query.message.reply_text(  # type: ignore
                 text, reply_markup=InlineKeyboardMarkup(keyboard)

@@ -155,9 +155,15 @@ class CloudflareR2Service:
     def generate_period_zip(self, prefix):
         """Fetches all files under a prefix and returns a ZIP file in memory."""
         try:
+            logger.info(f"🔍 Searching for photos with prefix: {prefix}")
             response = self.s3_client.list_objects_v2(Bucket=self.bucket_name, Prefix=prefix)
+
             if "Contents" not in response:
+                logger.warning(f"⚠️ No files found for prefix {prefix}")
                 return None
+
+            count = len(response["Contents"])
+            logger.info(f"📦 Found {count} photos. Generating ZIP...")
 
             zip_buffer = io.BytesIO()
             with zipfile.ZipFile(zip_buffer, "w") as zip_file:
@@ -171,5 +177,5 @@ class CloudflareR2Service:
             zip_buffer.seek(0)
             return zip_buffer
         except Exception as e:
-            print(f"Error generating ZIP: {e}")
+            logger.error(f"❌ Error generating ZIP: {e}")
             return None
