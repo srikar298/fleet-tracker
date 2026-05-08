@@ -168,15 +168,21 @@ class SheetsService:
             if (r.get("Date") == today or r.get("date") == today) and str(r.get("DriverID")) == str(driver_id):
                 trips += 1
                 try:
-                    km += float(r.get("Distance", 0))
+                    km += float(r.get("Distance") or r.get("distance") or 0)
                 except (ValueError, TypeError):
                     pass
                 try:
-                    fuel += float(r.get("Fuel_Cost", 0))
+                    fuel += float(
+                        r.get("Fuel_Cost")
+                        or r.get("fuel_cost")
+                        or r.get("Other_Expenses")
+                        or r.get("other_expenses")
+                        or 0
+                    )
                 except (ValueError, TypeError):
                     pass
                 try:
-                    revenue += float(r.get("Revenue", 0))
+                    revenue += float(r.get("Revenue") or r.get("revenue") or 0)
                 except (ValueError, TypeError):
                     pass
 
