@@ -3,7 +3,7 @@ import os
 
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
 from dotenv import load_dotenv
-from telegram import BotCommand, Update
+from telegram import BotCommand, MenuButtonDefault, Update
 from telegram.ext import (
     Application,
     CallbackQueryHandler,
@@ -96,6 +96,10 @@ class FleetBot:
         ]
         await application.bot.set_my_commands(commands)
         logger.info("Bot commands registered successfully.")
+
+        # 3. Set the Persistent Menu Button (The blue button in the corner)
+        await application.bot.set_chat_menu_button(menu_button=MenuButtonDefault())
+        logger.info("Persistent menu button configured.")
 
     async def start(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
         is_admin = self.is_admin(update.effective_user.id)
