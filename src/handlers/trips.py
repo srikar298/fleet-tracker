@@ -571,4 +571,30 @@ class TripHandler(BaseHandler):
                 "⚠️ An error occurred while saving the trip. Please contact admin."
             )
         finally:
-            context.user_data["active_trip"] = False  # type: ignore
+            self._clear_trip_data(context)
+
+    def _clear_trip_data(self, context: ContextTypes.DEFAULT_TYPE):
+        """Resets all trip-related data in the user session."""
+        keys_to_clear = [
+            "active_trip",
+            "trip_id",
+            "vehicle_id",
+            "start_odo",
+            "end_odo",
+            "start_image_url",
+            "end_image_url",
+            "fuel_image_url",
+            "expense_image_url",
+            "start_location",
+            "end_location",
+            "fuel_cost",
+            "other_expenses",
+            "start_time",
+            "end_time",
+            "distance",
+            "net",
+        ]
+        for key in keys_to_clear:
+            if key in context.user_data:
+                del context.user_data[key]
+        logger.info("🧹 Session cleared for new trip.")
