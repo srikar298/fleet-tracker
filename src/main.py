@@ -16,8 +16,6 @@ from telegram.ext import (
 )
 
 from core.states import (
-    DAILY_TARGET_TYPE,
-    DAILY_TARGET_VALUE,
     END_TRIP_EXPENSE_PHOTO,
     END_TRIP_IMAGE,
     END_TRIP_LOC,
@@ -192,14 +190,6 @@ class FleetBot:
                     )
                 ],
                 REPORT_PHOTO: [MessageHandler(filters.PHOTO, self.inc_handler.handle_report_photo)],
-                # Gamification Routing (handled by trips)
-                DAILY_TARGET_TYPE: [CallbackQueryHandler(self.trip_handler.handle_target_type)],
-                DAILY_TARGET_VALUE: [
-                    MessageHandler(
-                        filters.TEXT & ~filters.COMMAND,
-                        self.trip_handler.handle_target_value,
-                    )
-                ],
                 # Start Trip Routing
                 START_TRIP_VEHICLE: [CallbackQueryHandler(self.trip_handler.handle_start_vehicle)],
                 START_TRIP_ODO: [

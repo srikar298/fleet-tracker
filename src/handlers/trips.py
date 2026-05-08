@@ -7,7 +7,6 @@ from telegram.ext import ContextTypes, ConversationHandler
 
 from core.gamification import GamificationEngine
 from core.states import (
-    DAILY_TARGET_TYPE,
     DAILY_TARGET_VALUE,
     END_TRIP_EXPENSE_PHOTO,
     END_TRIP_IMAGE,
@@ -43,16 +42,18 @@ class TripHandler(BaseHandler):
 
         target = self.attendance.get_daily_target(update.effective_user.id)  # type: ignore
         if not target:
-            keyboard = [
-                [
-                    InlineKeyboardButton("🚗 Trips", callback_data="tgt_Trips"),
-                ]
-            ]
-            await update.message.reply_text(  # noqa: E501 # type: ignore
-                f"Good morning, {update.effective_user.first_name}! ☀️\nWhat is your goal for today?",  # type: ignore
-                reply_markup=InlineKeyboardMarkup(keyboard),
+            # Default to 5 Trips as requested
+            self.attendance.set_daily_target(
+                update.effective_user.id,
+                "V-MASTER",
+                "Trips",
+                5.0,
             )
-            return DAILY_TARGET_TYPE
+            await update.message.reply_text(  # type: ignore
+                f"Good morning, {update.effective_user.first_name}! ☀️\n"
+                "Your daily target is set to **5 Trips**. Let's get started!",
+                parse_mode="Markdown",
+            )
 
         return await self.prompt_vehicle_selection(update, context)
 
