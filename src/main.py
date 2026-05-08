@@ -67,9 +67,16 @@ from services.cloudflare_service import CloudflareR2Service
 from services.sheets_service import SheetsService
 from utils.ui import get_main_menu
 
-# Enable logging
-logging.basicConfig(format="%(asctime)s - %(name)s - %(levelname)s - %(message)s", level=logging.INFO)
+# Enable structured logging
+logging.basicConfig(
+    format="%(asctime)s | %(name)s | %(levelname)s | %(message)s", 
+    level=logging.INFO
+)
 logger = logging.getLogger(__name__)
+
+async def global_error_handler(update: object, context: ContextTypes.DEFAULT_TYPE) -> None:
+    """Log the error and send a message to notify the developer."""
+    logger.exception("⚠️ Unhandled exception:", exc_info=context.error)
 
 load_dotenv()
 
@@ -100,7 +107,11 @@ class FleetBot:
         return user_id in self.admin_ids
 
     async def post_init(self, application: Application) -> None:
-        """Starts the scheduler and registers bot commands."""
+        """Starts the scheduler, clears webhooks, and registers bot commands."""
+        # 0. Force clear any existing webhooks (Fixes 409 Conflict)
+        await application.bot.delete_webhook(drop_pending_updates=True)
+        logger.info("🗑️ Existing webhooks cleared.")
+
         # 1. Start Background Scheduler
         self.scheduler.start()
         logger.info(f"🚀 FleetTracker starting on Python {sys.version}")
@@ -188,6 +199,8 @@ class FleetBot:
             .post_init(self.post_init)
             .build()
         )
+        application.add_error_handler(global_error_handler)
+        logger.info("🤖 Bot application built with global error handler.")
         logger.info("🤖 Bot application built. Handlers registered.")
         conv_handler = ConversationHandler(
             entry_points=[
@@ -354,7 +367,7 @@ class FleetBot:
         application.add_handler(conv_handler)
         
         logger.info("📡 Bot polling starting... Press Ctrl+C to stop locally.")
-        application.run_polling()
+        application.run_polling(drop_pending_updates=True)
 
 
 if __name__ == "__main__":
