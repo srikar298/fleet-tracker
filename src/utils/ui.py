@@ -5,6 +5,7 @@ def get_main_menu(is_admin: bool = False) -> ReplyKeyboardMarkup:
     """Returns the primary navigation keyboard."""
     keyboard: list[list[KeyboardButton]] = [
         [KeyboardButton("🚗 Start Trip"), KeyboardButton("🛑 End Trip")],
+        [KeyboardButton("🌅 Start Bulk Day"), KeyboardButton("🌃 End Bulk Day")],
         [KeyboardButton("📊 Today Summary"), KeyboardButton("🏆 Leaderboard")],
         [KeyboardButton("👤 Profile"), KeyboardButton("⚠️ Report Damage")],
     ]

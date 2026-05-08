@@ -501,6 +501,7 @@ class TripHandler(BaseHandler):
             trip_record: dict[str, Any] = {
                 "trip_id": trip_id,
                 "date": date,
+                "trip_type": "Real-time",
                 "client_name": rates["client_name"],
                 "client_id": client_id,
                 "driver_id": update.effective_user.id,
@@ -546,12 +547,20 @@ class TripHandler(BaseHandler):
             fin = self.sheets.get_driver_financial_summary(update.effective_user.id)
             earnings_text = f"\n💰 **Today's Earnings**: `₹{fin['today']}`\n📈 **Monthly Progress**: `₹{fin['monthly']} / ₹{fin['base']}`"
 
+            # Fetch Financial Stats for UX
+            stats = self.sheets.get_driver_financial_summary(update.effective_user.id)
+            monthly_prog = stats.get("monthly_trips", 0)
+            monthly_tgt = stats.get("monthly_target_trips", 130)
+            monthly_earn = stats.get("monthly", 0)
+            base_sal = stats.get("base", 27000)
+
             if trips_done >= target:
                 text = (
                     "🏆 *Daily Goal Reached!* 🏆\n"
                     "━━━━━━━━━━━━━━━━━━━━\n"
-                    f"That was trip number **{trips_done}** today! Excellent work.\n"
-                    f"{earnings_text}\n\n"
+                    f"That was trip number **{trips_done}** today! Excellent work.\n\n"
+                    f"💰 **Monthly Earnings**: `₹{monthly_earn} / ₹{base_sal}`\n"
+                    f"📈 **Monthly Progress**: `{monthly_prog} / {monthly_tgt} Trips`\n\n"
                     "You've smashed your target. Do you want to keep going for extra rewards?"
                 )
                 await update.effective_message.reply_text(
@@ -565,8 +574,9 @@ class TripHandler(BaseHandler):
                     "✅ *Trip Recorded!* ✅\n"
                     "━━━━━━━━━━━━━━━━━━━━\n"
                     f"Great job! That was your **{trips_done}{ordinal}** trip today.\n"
-                    f"🚀 **{trips_left}** more to go to reach your daily goal of {target}!\n"
-                    f"{earnings_text}\n\n"
+                    f"🚀 **{trips_left}** more to go to reach your daily goal of {target}!\n\n"
+                    f"💰 **Monthly Earnings**: `₹{monthly_earn} / ₹{base_sal}`\n"
+                    f"📈 **Monthly Progress**: `{monthly_prog} / {monthly_tgt} Trips`\n\n"
                     f"_Trip ID: {trip_id}_"
                 )
                 await update.effective_message.reply_text(

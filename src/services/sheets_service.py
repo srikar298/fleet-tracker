@@ -1,5 +1,6 @@
 import logging
 import os
+import calendar
 from datetime import datetime
 from typing import Any, Dict, List, Optional
 
@@ -168,38 +169,83 @@ class SheetsService:
         # Order: DriverID, Name, License, License_Photo, ClientID, Phone, Base_Salary, Status
         return self.append_row("Master_Drivers", [driver_id, name, license, photo_url, client_id, phone, 27000, "Active"])
 
+    def record_trips_batch(self, records: list[dict[str, Any]]) -> None:
+        """Appends multiple trip records in a single batch operation with Trip Type."""
+        sheet = self.get_sheet("Trips")
+        if not sheet:
+            return
+            
+        rows = []
+        for trip_data in records:
+            rows.append([
+                trip_data.get("trip_id", "N/A"),           # A: Trip ID
+                trip_data.get("date", ""),                  # B: Date
+                trip_data.get("trip_type", "Bulk"),         # C: Trip Type
+                trip_data.get("client_name", "N/A"),        # D: Client Name
+                trip_data.get("client_id", "N/A"),          # E: Client ID
+                trip_data.get("vehicle_id", "Unknown"),     # F: Vehicle ID
+                trip_data.get("driver_id", ""),             # G: Driver ID
+                trip_data.get("distance", 0),               # H: Distance (KM)
+                trip_data.get("client_billed", 0),          # I: Client Billed
+                trip_data.get("driver_payout", 0),          # J: Driver Payout
+                trip_data.get("fuel_cost", 0),              # K: Fuel Cost
+                trip_data.get("other_expenses", 0),         # L: Other Expenses
+                "=I{row}-J{row}-K{row}-L{row}",             # M: Gross Margin
+                "=IF(I{row}>0, M{row}/I{row}, 0)",          # N: Net Margin %
+                trip_data.get("driver_score", 0),           # O: Driver Score
+                trip_data.get("flag", ""),                  # P: Flag
+                trip_data.get("remarks", ""),               # Q: Remarks
+                trip_data.get("start_time", ""),            # R: Start Time
+                trip_data.get("end_time", ""),              # S: End Time
+                trip_data.get("duration", ""),              # T: Duration
+                trip_data.get("start_odo", 0),              # U: Start Odo
+                trip_data.get("end_odo", 0),                # V: End Odo
+                trip_data.get("fuel_liters", 0),            # W: Fuel Liters
+                trip_data.get("start_image", ""),           # X: Start Image
+                trip_data.get("end_image", ""),             # Y: End Image
+                trip_data.get("fuel_image", ""),            # Z: Fuel Image
+                trip_data.get("expense_image", ""),         # AA: Expense Image
+                trip_data.get("start_location", ""),        # AB: Start Location
+                trip_data.get("end_location", ""),          # AC: End Location
+            ])
+        
+        sheet.append_rows(rows, value_input_option="USER_ENTERED") # type: ignore
+
     def record_trip(self, trip_data: dict[str, Any]) -> bool:
-        """Appends a final trip record to the Trips sheet matching Business First order"""
+        """Appends a single trip record matching the standardized order."""
         return self.append_row(
             "Trips",
             [
-                trip_data.get("trip_id"),           # A: TripID
-                trip_data.get("date"),              # B: Date
-                trip_data.get("client_name", "N/A"),# C: Client_Name
-                trip_data.get("client_id"),         # D: ClientID
-                trip_data.get("vehicle_id"),        # E: VehicleID
-                trip_data.get("driver_id"),         # F: DriverID
-                trip_data.get("distance"),          # G: Distance (KM)
-                trip_data.get("client_billed", 0),  # H: Client_Billed_Amount
-                trip_data.get("driver_payout", 0),  # I: Driver_Payout_Amount
-                trip_data.get("fuel_cost", 0),      # J: Fuel_Cost
-                trip_data.get("other_expenses", 0), # K: Other_Expenses
-                "=H{row}-I{row}-J{row}-K{row}",    # L: Gross_Margin
-                "=IF(H{row}>0, L{row}/H{row}, 0)",  # M: Net_Margin_Percentage
-                trip_data.get("driver_score"),      # N: Driver_Score
-                trip_data.get("flag"),              # O: Flag
-                trip_data.get("remarks"),           # P: Remarks
-                trip_data.get("start_time"),        # Q: Start_Time
-                trip_data.get("end_time"),          # R: End_Time
-                trip_data.get("start_odo"),         # S: Start_Odometer
-                trip_data.get("end_odo"),           # T: End_Odometer
-                trip_data.get("fuel_liters"),       # U: Fuel_Liters
-                trip_data.get("start_image"),       # V: Start_Image
-                trip_data.get("end_image"),         # W: End_Image
-                trip_data.get("fuel_image"),        # X: Receipt_Image
-                trip_data.get("start_location"),    # Y: Start_Location
-                trip_data.get("end_location"),      # Z: End_Location
-            ],
+                trip_data.get("trip_id", "N/A"),           # A: Trip ID
+                trip_data.get("date", ""),                  # B: Date
+                trip_data.get("trip_type", "Real-time"),    # C: Trip Type
+                trip_data.get("client_name", "N/A"),        # D: Client Name
+                trip_data.get("client_id", "N/A"),          # E: Client ID
+                trip_data.get("vehicle_id", "Unknown"),     # F: Vehicle ID
+                trip_data.get("driver_id", ""),             # G: Driver ID
+                trip_data.get("distance", 0),               # H: Distance (KM)
+                trip_data.get("client_billed", 0),          # I: Client Billed
+                trip_data.get("driver_payout", 0),          # J: Driver Payout
+                trip_data.get("fuel_cost", 0),              # K: Fuel Cost
+                trip_data.get("other_expenses", 0),         # L: Other Expenses
+                "=I{row}-J{row}-K{row}-L{row}",             # M: Gross Margin
+                "=IF(I{row}>0, M{row}/I{row}, 0)",          # N: Net Margin %
+                trip_data.get("driver_score", 0),           # O: Driver Score
+                trip_data.get("flag", ""),                  # P: Flag
+                trip_data.get("remarks", ""),               # Q: Remarks
+                trip_data.get("start_time", ""),            # R: Start Time
+                trip_data.get("end_time", ""),              # S: End_Time
+                trip_data.get("duration", ""),              # T: Duration
+                trip_data.get("start_odo", 0),              # U: Start Odo
+                trip_data.get("end_odo", 0),                # V: End Odo
+                trip_data.get("fuel_liters", 0),            # W: Fuel Liters
+                trip_data.get("start_image", ""),           # X: Start Image
+                trip_data.get("end_image", ""),             # Y: End Image
+                trip_data.get("fuel_image", ""),            # Z: Fuel Image
+                trip_data.get("expense_image", ""),         # AA: Expense Image
+                trip_data.get("start_location", ""),        # AB: Start Location
+                trip_data.get("end_location", ""),          # AC: End Location
+            ]
         )
 
     def get_driver_today_summary(self, driver_id: int) -> dict[str, Any]:
@@ -379,13 +425,15 @@ class SheetsService:
             try:
                 base_salary = float(d_info["Base_Salary"])
             except (ValueError, TypeError):
-                pass
-
+                today_earnings = 0.0
+        monthly_total = 0.0
+        
         if att_ws:
             recs = att_ws.get_all_records()
             for r in recs:
+                # Key must match wipe_and_seed precisely
                 if str(r.get("DriverID")) == str(driver_id) and str(r.get("Date")) == today:
-                    today_earnings = float(r.get("Daily_Earnings") or 0)
+                    today_earnings = float(r.get("Today_Earnings") or 0)
                     break
         
         if pay_ws:
@@ -395,13 +443,44 @@ class SheetsService:
                     monthly_total = float(pr.get("Net_Payout") or 0)
                     break
                     
+        # Calculate Monthly Trips and Target
+        now = datetime.now()
+        year, month_idx = now.year, now.month
+        num_days = calendar.monthrange(year, month_idx)[1]
+        sundays = len([d for d in range(1, num_days + 1) if datetime(year, month_idx, d).weekday() == 6])
+        working_days = num_days - sundays
+        monthly_target_trips = working_days * 5
+        
+        monthly_trips = 0.0
+        if att_ws:
+            recs = att_ws.get_all_records()
+            for r in recs:
+                if str(r.get("DriverID")) == str(driver_id) and str(r.get("Date")).startswith(month):
+                    monthly_trips += float(r.get("Completed_Value") or 0)
+
         return {
             "today": round(today_earnings, 2),
             "monthly": round(monthly_total, 2),
-            "base": base_salary
+            "base": base_salary,
+            "monthly_trips": int(monthly_trips),
+            "monthly_target_trips": int(monthly_target_trips)
         }
 
     def get_all_clients(self) -> list[dict[str, Any]]:
-        """Returns all records from Master_Clients."""
+        """Returns all records from Master_Clients with normalized keys."""
         ws = self.get_sheet("Master_Clients")
-        return ws.get_all_records() if ws else []
+        if not ws:
+            return []
+        
+        records = ws.get_all_records()
+        normalized = []
+        for r in records:
+            # Normalize keys for the UI
+            name = r.get("Client_Name") or r.get("ClientName") or r.get("Name") or "Unknown Client"
+            c_id = r.get("ClientID") or r.get("Client_ID") or r.get("ID")
+            normalized.append({
+                "ID": str(c_id),
+                "Name": str(name),
+                **r
+            })
+        return normalized

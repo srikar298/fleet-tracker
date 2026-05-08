@@ -76,6 +76,58 @@ class AttendanceService:
             ]
         )
 
+    def update_attendance_progress_batch(self, driver_id: str | int, total_trips_to_add: float) -> None:
+        """Updates trip count in bulk to save API quota."""
+        today = datetime.now().strftime("%Y-%m-%d")
+        sheet = self.sheets.get_sheet("Attendance")
+        if not sheet:
+            return
+
+        records = sheet.get_all_records()
+        row_idx = -1
+        current_val = 0.0
+        
+        for i, record in enumerate(records, start=2):
+            if str(record.get("DriverID")) == str(driver_id) and record.get("Date") == today:
+                row_idx = i
+                current_val = float(record.get("Completed_Value") or 0)
+                break
+
+        if row_idx != -1:
+            new_val = current_val + total_trips_to_add
+            # Update Completed_Value (Column 9)
+            sheet.update_cell(row_idx, 9, new_val)
+            
+            # Update other status logic
+            target = float(records[row_idx-2].get("Target_Value") or 5.0)
+            achieved = "Yes" if new_val >= target else "No"
+            sheet.update_cell(row_idx, 10, achieved)
+            
+            # Recalculate earnings
+            driver_info = self.sheets.get_driver_by_id(driver_id)
+            base_salary = 27000.0
+            if driver_info and driver_info.get("Base_Salary"):
+                try:
+                    base_salary = float(driver_info["Base_Salary"])
+                except (ValueError, TypeError):
+                    pass
+
+            daily_base = base_salary / 26.0
+            incentive_per_trip = 100.0
+            
+            earnings = daily_base
+            if achieved == "No":
+                earnings = (new_val / target) * daily_base
+            elif new_val > target:
+                extra = new_val - target
+                earnings = daily_base + (extra * incentive_per_trip)
+            
+            sheet.update_cell(row_idx, 11, round(earnings, 2))
+            self.update_monthly_payroll_live(driver_id, today[:7], earnings)
+        else:
+            # Auto-create logic if missing
+            self.update_attendance_progress(driver_id, total_trips_to_add)
+
     def update_attendance_progress(self, driver_id: str | int, amount: float = 1.0) -> None:
         """Updates trip count and calculates daily earnings based on target"""
         today = datetime.now().strftime("%Y-%m-%d")
