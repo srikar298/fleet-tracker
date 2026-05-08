@@ -252,3 +252,49 @@ class AttendanceService:
             ])
         
         return True
+
+    def mark_status(self, driver_id: str | int, status: str, date: str) -> bool:
+        """Manually sets the status for a driver on a specific date."""
+        sheet = self.sheets.get_sheet("Attendance")
+        if not sheet:
+            return False
+
+        records = sheet.get_all_records()
+        row_idx = -1
+        for i, r in enumerate(records, start=2):
+            if str(r.get("DriverID")) == str(driver_id) and str(r.get("Date")) == date:
+                row_idx = i
+                break
+        
+        # Earnings logic for Sick/Holiday/Absent
+        earnings = 0.0
+        if status == "Present":
+            # If we mark as present manually, we assume base daily
+            d_info = self.sheets.get_driver_by_id(driver_id)
+            base = 27000.0
+            if d_info and d_info.get("Base_Salary"):
+                base = float(d_info["Base_Salary"])
+            earnings = base / 26.0
+
+        if row_idx != -1:
+            sheet.update_cell(row_idx, 6, status) # Column 6: Status
+            sheet.update_cell(row_idx, 11, earnings) # Column 11: Daily_Earnings
+        else:
+            # Append new row
+            sheet.append_row([
+                date,
+                driver_id,
+                "N/A", # ClientID
+                "00:00:00", # Start
+                "00:00:00", # End
+                status,
+                "N/A", # Target_Type
+                0,     # Target_Value
+                0,     # Completed_Value
+                "N/A", # Target_Achieved
+                earnings
+            ])
+        
+        # Trigger live payroll update
+        self.update_monthly_payroll_live(driver_id, date[:7], earnings)
+        return True

@@ -387,3 +387,8 @@ class SheetsService:
             "monthly": round(monthly_total, 2),
             "base": base_salary
         }
+
+    def get_all_clients(self) -> list[dict[str, Any]]:
+        """Returns all records from Master_Clients."""
+        ws = self.get_sheet("Master_Clients")
+        return ws.get_all_records() if ws else []

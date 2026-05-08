@@ -475,10 +475,7 @@ class TripHandler(BaseHandler):
 
             trip_data: dict[str, Any] = {
                 "distance": distance,
-                "duration_mins": duration,
-                "mileage": context.user_data.get("mileage", 0),
                 "fuel_cost": float(context.user_data.get("fuel_cost", 0)),
-                "revenue": float(context.user_data.get("revenue", 0)),
             }
 
             validator = TripValidator()

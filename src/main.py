@@ -295,6 +295,8 @@ class FleetBot:
         application.add_handler(CommandHandler("setprice", self.admin_handler.set_price_cmd))
         application.add_handler(CommandHandler("payroll", self.admin_handler.payroll_cmd))
         application.add_handler(CommandHandler("setsalary", self.admin_handler.set_salary_cmd))
+        application.add_handler(CommandHandler("clients", self.admin_handler.list_clients_cmd))
+        application.add_handler(CommandHandler("mark", self.admin_handler.mark_attendance_cmd))
 
         # Admin Callbacks (Generic)
         application.add_handler(

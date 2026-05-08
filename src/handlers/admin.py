@@ -416,3 +416,58 @@ class AdminHandler(BaseHandler):
             await update.message.reply_text("❌ Salary amount must be a number.")
             
         return None
+
+    async def list_clients_cmd(self, update: Update, context: ContextTypes.DEFAULT_TYPE) -> Any:
+        """Lists all B2B clients and their rates."""
+        if not update.message:
+            return None
+            
+        clients = self.sheets.get_all_clients()
+        if not clients:
+            await update.message.reply_text("📭 No clients found in Master_Clients.")
+            return None
+            
+        text = "🏢 *Active B2B Clients*\n━━━━━━━━━━━━━━━━━━━━\n"
+        for c in clients:
+            text += (
+                f"🔹 **{c['Client_Name']}** (`{c['ClientID']}`)\n"
+                f"   💰 Billed: ₹{c.get('Client_Billed_Per_Trip', 0)}\n"
+                f"   💸 Payout: ₹{c.get('Driver_Payout_Per_Trip', 0)}\n"
+                f"   📄 Type: {c.get('Contract_Type', 'N/A')}\n\n"
+            )
+        
+        await update.message.reply_text(text, parse_mode="Markdown")
+        return None
+
+    async def mark_attendance_cmd(self, update: Update, context: ContextTypes.DEFAULT_TYPE) -> Any:
+        """Usage: /mark <DriverID> <Status> <Date>
+        Example: /mark 12345678 Sick 2026-05-10
+        Statuses: Sick, Holiday, Absent, Present
+        """
+        if not update.message or not update.message.text:
+            return None
+        
+        parts = update.message.text.split()
+        if len(parts) < 3:
+            await update.message.reply_text(
+                "⚠️ Usage: `/mark <DriverID> <Status> [YYYY-MM-DD]`\n"
+                "Example: `/mark 12345678 Sick` (defaults to today)",
+                parse_mode="Markdown"
+            )
+            return None
+            
+        d_id = parts[1]
+        status = parts[2].capitalize()
+        date = parts[3] if len(parts) > 3 else datetime.now().strftime("%Y-%m-%d")
+        
+        if status not in ["Sick", "Holiday", "Absent", "Present"]:
+            await update.message.reply_text("❌ Status must be: Sick, Holiday, Absent, or Present.")
+            return None
+            
+        success = self.attendance.mark_status(d_id, status, date)
+        if success:
+            await update.message.reply_text(f"✅ Driver `{d_id}` marked as **{status}** for `{date}`.", parse_mode="Markdown")
+        else:
+            await update.message.reply_text("❌ Failed to update attendance.")
+            
+        return None
