@@ -24,4 +24,6 @@
     REPORT_VEHICLE,
     REPORT_DESC,
     REPORT_PHOTO,
-) = range(25)
+    ADMIN_DL_FROM,
+    ADMIN_DL_TO,
+) = range(27)

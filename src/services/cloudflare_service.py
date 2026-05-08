@@ -183,3 +183,40 @@ class CloudflareR2Service:
         logger.warning(f"🚩 Trip Flagged for Audit: {prefix}")
         # Optionally, we could copy these to a 'flagged/' folder here
         return True
+
+    def generate_range_zip(self, start_date, end_date):
+        """Fetches all files between two dates and returns a ZIP."""
+        try:
+            logger.info(f"🔍 Generating ZIP from {start_date} to {end_date}")
+
+            # Convert strings to datetime objects
+            start = datetime.strptime(start_date, "%Y-%m-%d")
+            end = datetime.strptime(end_date, "%Y-%m-%d")
+
+            zip_buffer = io.BytesIO()
+            files_found = 0
+
+            with zipfile.ZipFile(zip_buffer, "w") as zip_file:
+                current_date = start
+                while current_date <= end:
+                    date_str = current_date.strftime("%Y-%m-%d")
+                    prefix = f"trips/{date_str}/"
+
+                    response = self.s3_client.list_objects_v2(Bucket=self.bucket_name, Prefix=prefix)
+                    if "Contents" in response:
+                        for obj in response["Contents"]:
+                            file_key = obj["Key"]
+                            file_data = self.s3_client.get_object(Bucket=self.bucket_name, Key=file_key)["Body"].read()
+                            zip_file.writestr(file_key, file_data)
+                            files_found += 1
+
+                    current_date += timedelta(days=1)
+
+            if files_found == 0:
+                return None
+
+            zip_buffer.seek(0)
+            return zip_buffer
+        except Exception as e:
+            logger.error(f"❌ Error generating range ZIP: {e}")
+            return None

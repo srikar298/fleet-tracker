@@ -32,6 +32,7 @@ class AdminHandler(BaseHandler):
             "📸 *Media Downloads*\n"
             "• /downloadtoday - Today's trip photos\n"
             "• /downloadweekly - This week's photos\n"
+            "• /downloadrange - Select Start & End dates\n"
             "• /downloadphotos <YYYY-MM-DD>\n\n"
             "💡 _Tip: Tapping the Admin button resets stuck states._"
         )
@@ -110,6 +111,48 @@ class AdminHandler(BaseHandler):
             )
         else:
             await update.effective_message.reply_text("❌ No photos found in the archive.")
+
+    async def start_download_range(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
+        if not self._is_admin(update.effective_user.id):
+            return
+        from core.states import ADMIN_DL_FROM
+
+        await update.effective_message.reply_text(
+            "📅 *Custom Range Download*\n\nPlease enter the **START DATE** (YYYY-MM-DD):", parse_mode="Markdown"
+        )
+        return ADMIN_DL_FROM
+
+    async def handle_from_date(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
+        from core.states import ADMIN_DL_TO
+
+        context.user_data["dl_from"] = update.message.text
+        await update.message.reply_text("Great! Now enter the **END DATE** (YYYY-MM-DD):", parse_mode="Markdown")
+        return ADMIN_DL_TO
+
+    async def handle_to_date(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
+        from telegram.ext import ConversationHandler
+
+        start_date = context.user_data.get("dl_from")
+        end_date = update.message.text
+
+        await update.message.reply_text(
+            f"📦 Generating ZIP from `{start_date}` to `{end_date}`... this may take a minute.", parse_mode="Markdown"
+        )
+
+        zip_buffer = self.drive.generate_range_zip(start_date, end_date)
+
+        if zip_buffer:
+            await update.message.reply_document(
+                document=zip_buffer,
+                filename=f"Fleet_Range_{start_date}_to_{end_date}.zip",
+                caption=f"📁 Archive: {start_date} to {end_date}",
+            )
+        else:
+            await update.message.reply_text(
+                f"❌ No photos found between `{start_date}` and `{end_date}`.", parse_mode="Markdown"
+            )
+
+        return ConversationHandler.END
 
     async def download_photos(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
         if not self._is_admin(update.effective_user.id):

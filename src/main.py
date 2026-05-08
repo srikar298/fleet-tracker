@@ -16,6 +16,8 @@ from telegram.ext import (
 )
 
 from core.states import (
+    ADMIN_DL_FROM,
+    ADMIN_DL_TO,
     END_TRIP_EXPENSE_PHOTO,
     END_TRIP_IMAGE,
     END_TRIP_LOC,
@@ -161,6 +163,7 @@ class FleetBot:
                     filters.Regex("^⚠️ Report Damage$"),
                     self.inc_handler.report_damage_cmd,
                 ),
+                CommandHandler("downloadrange", self.admin_handler.start_download_range),
                 MessageHandler(filters.Regex("^❌ Cancel$"), self.cancel),
             ],
             states={
@@ -245,6 +248,9 @@ class FleetBot:
                 ],
                 END_TRIP_EXPENSE_PHOTO: [MessageHandler(filters.PHOTO, self.trip_handler.handle_end_expense_photo)],
                 END_TRIP_SUMMARY: [CallbackQueryHandler(self.trip_handler.handle_end_summary)],
+                # Admin Download Range
+                ADMIN_DL_FROM: [MessageHandler(filters.TEXT & ~filters.COMMAND, self.admin_handler.handle_from_date)],
+                ADMIN_DL_TO: [MessageHandler(filters.TEXT & ~filters.COMMAND, self.admin_handler.handle_to_date)],
             },
             fallbacks=[
                 CommandHandler("start", self.start),
