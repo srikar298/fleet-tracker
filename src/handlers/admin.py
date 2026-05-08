@@ -370,3 +370,23 @@ class AdminHandler(BaseHandler):
             await update.message.reply_text("❌ Billed and Payout must be numbers.")
         
         return None
+
+    async def payroll_cmd(self, update: Update, context: ContextTypes.DEFAULT_TYPE) -> Any:
+        if not update.message or not update.message.text:
+            return None
+        
+        parts = update.message.text.split()
+        if len(parts) < 2:
+            month_str = datetime.now().strftime("%Y-%m")
+        else:
+            month_str = parts[1]
+            
+        await update.message.reply_text(f"⏳ Generating payroll report for **{month_str}**...", parse_mode="Markdown")
+        
+        success = self.attendance.generate_monthly_payroll(month_str)
+        if success:
+            await update.message.reply_text(f"✅ Payroll for **{month_str}** generated in the Monthly_Payroll sheet!", parse_mode="Markdown")
+        else:
+            await update.message.reply_text("❌ Failed to generate payroll. Check Attendance records.")
+            
+        return None

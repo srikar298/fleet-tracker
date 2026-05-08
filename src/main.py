@@ -288,6 +288,7 @@ class FleetBot:
         application.add_handler(CommandHandler("downloadrange", self.admin_handler.start_download_range))
         application.add_handler(CommandHandler("downloadphotos", self.admin_handler.download_photos))
         application.add_handler(CommandHandler("setprice", self.admin_handler.set_price_cmd))
+        application.add_handler(CommandHandler("payroll", self.admin_handler.payroll_cmd))
 
         # Admin Callbacks (Generic)
         application.add_handler(

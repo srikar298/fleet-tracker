@@ -59,7 +59,7 @@ class AttendanceService:
                 sheet.update_cell(i, 8, t_value)
                 return
 
-        # If no check-in row exists, create it
+        # If no check-in row exists, create it with 0 completed
         sheet.append_row(
             [
                 today,
@@ -70,5 +70,108 @@ class AttendanceService:
                 "Present",
                 t_type,
                 t_value,
+                0,      # Completed_Value
+                "No",   # Target_Achieved
+                0       # Daily_Earnings
             ]
         )
+
+    def update_attendance_progress(self, driver_id: str | int, amount: float = 1.0) -> None:
+        """Updates trip count and calculates daily earnings based on target"""
+        today = datetime.now().strftime("%Y-%m-%d")
+        sheet = self.sheets.get_sheet("Attendance")
+        if not sheet:
+            return
+
+        records = sheet.get_all_records()
+        for i, record in enumerate(records, start=2):
+            if str(record.get("DriverID")) == str(driver_id) and record.get("Date") == today:
+                # 1. Update Completion
+                current = float(record.get("Completed_Value") or 0)
+                new_val = current + amount
+                sheet.update_cell(i, 9, new_val)
+                
+                # 2. Update Target Status
+                target = float(record.get("Target_Value") or 5.0)
+                achieved = "Yes" if new_val >= target else "No"
+                sheet.update_cell(i, 10, achieved)
+                
+                # 3. Calculate Daily Earnings
+                # Fixed Salary: 27000 / 26 days = 1038.5 per day
+                daily_base = 1038.5
+                incentive_per_trip = 100.0 # Extra money for trips > target
+                
+                earnings = daily_base
+                if achieved == "No":
+                    # Deduction logic: Pro-rata of base salary based on trips?
+                    # Example: If only 3/5 done, they get 3/5 of daily pay
+                    earnings = (new_val / target) * daily_base
+                elif new_val > target:
+                    # Bonus logic: Base + (Extra Trips * Incentive)
+                    extra = new_val - target
+                    earnings = daily_base + (extra * incentive_per_trip)
+                
+                sheet.update_cell(i, 11, round(earnings, 2))
+                return
+
+    def generate_monthly_payroll(self, month_str: str) -> bool:
+        """Aggregates attendance data into Monthly_Payroll sheet for a given month (YYYY-MM)"""
+        attendance_ws = self.sheets.get_sheet("Attendance")
+        payroll_ws = self.sheets.get_sheet("Monthly_Payroll")
+        if not attendance_ws or not payroll_ws:
+            return False
+
+        records = attendance_ws.get_all_records()
+        # Aggregator map: {driver_id: {present: X, earnings: Y, base: 27000}}
+        stats: dict[str, Any] = {}
+        
+        for r in records:
+            date = str(r.get("Date"))
+            if date.startswith(month_str):
+                d_id = str(r.get("DriverID"))
+                if d_id not in stats:
+                    stats[d_id] = {
+                        "present": 0,
+                        "total_earnings": 0.0,
+                        "base_salary": 27000.0,
+                        "extra_bonus": 0.0,
+                        "shortfall": 0.0
+                    }
+                
+                status = str(r.get("Status"))
+                if status == "Present":
+                    stats[d_id]["present"] += 1
+                    
+                    earnings = float(r.get("Daily_Earnings") or 0)
+                    daily_base = 1038.5
+                    
+                    if earnings > daily_base:
+                        stats[d_id]["extra_bonus"] += (earnings - daily_base)
+                        stats[d_id]["total_earnings"] += daily_base # Keep base separate
+                    elif earnings < daily_base:
+                        stats[d_id]["shortfall"] += (daily_base - earnings)
+                        stats[d_id]["total_earnings"] += earnings
+                    else:
+                        stats[d_id]["total_earnings"] += daily_base
+
+        # Push to Payroll sheet
+        for d_id, data in stats.items():
+            # Calculate working days (approx 26)
+            working_days = 26
+            net_payout = data["base_salary"] - ( (working_days - data["present"]) * 1038.5 ) + data["extra_bonus"] - data["shortfall"]
+            
+            # Month, DriverID, Base_Salary, Working_Days, Present_Days, Holidays, Sick_LOP_Days, Extra_Trips_Bonus, Shortfall_Deduction, Net_Payout
+            payroll_ws.append_row([
+                month_str,
+                d_id,
+                data["base_salary"],
+                working_days,
+                data["present"],
+                0, # Holidays to be entered by Admin
+                0, # Sick/LOP to be entered by Admin
+                round(data["extra_bonus"], 2),
+                round(data["shortfall"], 2),
+                round(max(0, net_payout), 2)
+            ])
+        
+        return True

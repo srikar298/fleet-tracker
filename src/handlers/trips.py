@@ -531,6 +531,7 @@ class TripHandler(BaseHandler):
             }
 
             self.sheets.record_trip(trip_record)
+            self.attendance.update_attendance_progress(update.effective_user.id, 1.0)
             self.sheets.update_vehicle_status(
                 str(context.user_data.get("vehicle_id", "Unknown")),
                 context.user_data.get("end_odo", 0),
