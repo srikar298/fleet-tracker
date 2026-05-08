@@ -155,7 +155,16 @@ class CloudflareR2Service:
     def generate_period_zip(self, prefix):
         """Fetches all files under a prefix and returns a ZIP file in memory."""
         try:
-            logger.info(f"🔍 Searching for photos with prefix: {prefix}")
+            logger.info(f"🔍 Auditing R2 Bucket: {self.bucket_name} for prefix: {prefix}")
+
+            # Debug: List EVERYTHING in the bucket to see what's actually there
+            debug_list = self.s3_client.list_objects_v2(Bucket=self.bucket_name, MaxKeys=10)
+            if "Contents" in debug_list:
+                keys = [obj["Key"] for obj in debug_list["Contents"]]
+                logger.info(f"📁 Current files in bucket (sample): {keys}")
+            else:
+                logger.warning("📭 Bucket appears to be empty during audit.")
+
             response = self.s3_client.list_objects_v2(Bucket=self.bucket_name, Prefix=prefix)
 
             if "Contents" not in response:
